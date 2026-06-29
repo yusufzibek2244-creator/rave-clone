@@ -170,7 +170,7 @@
         // WEBSOCKET (PYTHON İLE HABERLEŞME)
         // ==========================================
         function connectToPython(roomId) {
-            ws = new WebSocket(`ws://127.0.0.1:8000/ws/${roomId}`);
+            ws = new WebSocket(`wss://rave-clone-934x.onrender.com/ws/${roomId}`);
 
             ws.onopen = () => {
                 document.getElementById('connectionDot').classList.replace('bg-red-500', 'bg-emerald-500');
