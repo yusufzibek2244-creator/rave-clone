@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rave Clone - v0.4 (Sonsuz Döngü Korumalı)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { rave: { bg: '#1a1a1a', panel: '#2d2d2d', border: '#3a3a3a', accent: '#2196f3' } } } }
+        }
+    </script>
+</head>
+<body class="bg-rave-bg text-gray-200 min-h-screen p-0 font-sans flex flex-col">
+
+    <header class="flex justify-between items-center bg-rave-bg px-4 py-2 border-b border-rave-border shadow-md">
+        <h1 class="text-lg font-bold text-gray-100 cursor-pointer">rave</h1>
+        <div class="flex items-center gap-2">
+            <span id="connectionDot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span class="text-xs text-gray-400 font-mono" id="connectionStatus">Bağlantı Bekleniyor</span>
+        </div>
+    </header>
+
+    <main class="flex flex-1 overflow-hidden">
+        
+        <div id="videoContainer" class="flex-1 bg-black flex flex-col p-4 space-y-4">
+            
+            <div id="videoInfoBar" class="flex justify-between items-center border-b border-rave-border pb-2 hidden">
+                <div class="flex items-center gap-3">
+                    <h2 id="videoTitle" class="text-sm font-semibold text-gray-100">Video Yüklendi</h2>
+                </div>
+            </div>
+
+            <div class="aspect-video w-full flex-1 bg-rave-panel rounded-lg overflow-hidden relative shadow-inner">
+                <div id="player"></div> 
+            </div>
+            
+            <div id="setupPanel" class="bg-rave-panel p-6 rounded-lg space-y-4 shadow-xl border border-rave-border">
+                <h3 class="text-md font-semibold text-rave-accent">Yeni Bir Oda Kur</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="videoUrlInput" placeholder="YouTube linki yapıştır..." class="flex-1 bg-rave-bg px-4 py-2.5 rounded-lg border border-rave-border focus:border-rave-accent outline-none text-sm">
+                    <button onclick="createRoomFromUrl()" class="bg-rave-accent text-white px-6 py-2.5 rounded-lg font-medium text-sm transition hover:bg-blue-600">Oda Kur</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="ravePanel" class="w-[320px] bg-rave-panel border-l border-rave-border flex flex-col">
+            
+            <div class="p-4 border-b border-rave-border space-y-4">
+                <div class="flex items-center gap-3">
+                    <span id="raveIdText" class="text-sm font-semibold text-gray-100">RAVE-<span id="roomIdText">...</span></span>
+                    <span id="userBadge" class="text-xs bg-rave-bg px-2 py-1 rounded text-gray-400 ml-auto font-mono"></span>
+                </div>
+            </div>
+
+            <div class="p-4 space-y-4 border-b border-rave-border">
+                <div class="space-y-1.5">
+                    <div class="flex items-center gap-2 text-xs text-gray-400">
+                        <span>🔗 Davet Linki</span>
+                        <span id="copyStatus" class="ml-auto text-emerald-400 text-[10px] hidden">Kopyalandı!</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="shareUrlInput" readonly class="flex-1 bg-rave-bg text-gray-400 text-[11px] px-3 py-1.5 rounded border border-rave-border font-mono select-all">
+                        <button onclick="copyRoomLink()" id="copyBtn" class="bg-rave-accent text-white text-[10px] px-3 py-1.5 rounded font-medium hover:bg-blue-600">Kopyala</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="chatMessages" class="flex-1 p-4 space-y-3 overflow-y-auto text-xs text-gray-300 font-mono">
+                </div>
+
+            <div class="p-3 border-t border-rave-border bg-rave-bg flex items-center gap-2">
+                <input type="text" id="chatInput" onkeypress="handleEnter(event)" placeholder="Mesaj yaz..." class="flex-1 bg-rave-panel px-3 py-2 rounded-lg border border-rave-border focus:border-rave-accent outline-none text-xs">
+                <button onclick="sendChatMessage()" class="text-rave-accent hover:text-white font-bold px-2">Gönder</button>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        let player;
+        let activeVideoId = null;
+        let ws = null; 
+        let myUsername = "User-" + Math.floor(Math.random() * 1000); 
+        let remoteLockUntil = 0; // MÜHENDİSLİK ÇÖZÜMÜ: Sonsuz döngü kilit mekanizması
+
+        window.onload = () => {
+            document.getElementById('userBadge').innerText = myUsername;
+            const params = new URLSearchParams(window.location.search);
+            const room = params.get('room');
+            const vid = params.get('v');
+
+            if (room && vid) {
+                setupRoomLayout(room, vid);
+            }
+        };
+
+        function onYouTubeIframeAPIReady() {
+            if(activeVideoId) loadYouTubePlayer(activeVideoId);
+        }
+
+        function extractVideoID(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        function createRoomFromUrl() {
+            const url = document.getElementById('videoUrlInput').value.trim();
+            const videoId = extractVideoID(url);
+            if(!videoId) return alert("Geçerli bir link yapıştır!");
+
+            const newRoomCode = Math.floor(1000 + Math.random() * 9000);
+            const newStateUrl = `${window.location.pathname}?room=${newRoomCode}&v=${videoId}`;
+            window.history.pushState({path: newStateUrl}, '', newStateUrl);
+            setupRoomLayout(newRoomCode, videoId);
+        }
+
+        function setupRoomLayout(roomCode, videoId) {
+            activeVideoId = videoId;
+            document.getElementById('setupPanel').classList.add('hidden');
+            document.getElementById('videoInfoBar').classList.remove('hidden');
+            document.getElementById('roomIdText').innerText = roomCode;
+            document.getElementById('shareUrlInput').value = window.location.href;
+
+            if (player) player.loadVideoById(videoId);
+            else setTimeout(() => loadYouTubePlayer(videoId), 500);
+
+            connectToPython(roomCode);
+        }
+
+        function loadYouTubePlayer(vid){
+            player = new YT.Player('player', {
+                height: '100%', width: '100%', videoId: vid,
+                playerVars: { 
+                    'playsinline': 1, 
+                    'rel': 0, 
+                    'controls': 1,
+                    'origin': window.location.origin
+                }, 
+                events: {
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+
+        // ==========================================
+        // VİDEO SENKRONİZASYON MOTORU
+        // ==========================================
+        function onPlayerStateChange(event) {
+            if(!ws || ws.readyState !== WebSocket.OPEN) return;
+            
+            // KİLİT KONTROLÜ: Eğer şu an Python'dan gelen emrin şoku (1 saniyelik soğuma) sürüyorsa, görmezden gel!
+            if (Date.now() < remoteLockUntil) return;
+
+            if(event.data == 1 || event.data == 2) {
+                const currentTime = player.getCurrentTime();
+                const payload = {
+                    type: 'sync',
+                    state: event.data, 
+                    time: currentTime,
+                    sender: myUsername
+                };
+                ws.send(JSON.stringify(payload));
+            }
+        }
+
+        // ==========================================
+        // WEBSOCKET (PYTHON İLE HABERLEŞME)
+        // ==========================================
+        function connectToPython(roomId) {
+            ws = new WebSocket(`ws://127.0.0.1:8000/ws/${roomId}`);
+
+            ws.onopen = () => {
+                document.getElementById('connectionDot').classList.replace('bg-red-500', 'bg-emerald-500');
+                document.getElementById('connectionStatus').innerText = "Bağlı";
+                addChatMessage("Sistem", "Odaya bağlandın.", "text-emerald-400");
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'chat') {
+                    addChatMessage(data.sender, data.text, "text-gray-300");
+                } 
+                else if (data.type === 'sync' && data.sender !== myUsername) {
+                    // KİLİDİ DEVREYE SOK: Önümüzdeki 1000 milisaniye boyunca YouTube'un tetikleyeceği yankı eventlerini çöpe at
+                    remoteLockUntil = Date.now() + 1000; 
+                    
+                    if(data.state == 1) { 
+                        player.seekTo(data.time, true);
+                        player.playVideo();
+                        addChatMessage("Sistem", `${data.sender} videoyu başlattı.`, "text-rave-accent");
+                    } 
+                    else if(data.state == 2) { 
+                        player.seekTo(data.time, true);
+                        player.pauseVideo();
+                        addChatMessage("Sistem", `${data.sender} videoyu durdurdu.`, "text-amber-400");
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                document.getElementById('connectionDot').classList.replace('bg-emerald-500', 'bg-red-500');
+                document.getElementById('connectionStatus').innerText = "Koptu";
+                addChatMessage("Sistem", "Sunucu ile bağlantı kesildi.", "text-red-400");
+            };
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (text !== "" && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'chat', sender: myUsername, text: text }));
+                input.value = "";
+            }
+        }
+
+        function handleEnter(e) { if(e.key === 'Enter') sendChatMessage(); }
+
+        function addChatMessage(sender, text, colorClass) {
+            const box = document.getElementById('chatMessages');
+            box.innerHTML += `<p><span class="${colorClass} font-bold">[${sender}]</span> ${text}</p>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function copyRoomLink() {
+            const copyText = document.getElementById("shareUrlInput");
+            copyText.select();
+            navigator.clipboard.writeText(copyText.value);
+            const status = document.getElementById('copyStatus');
+            status.classList.remove('hidden');
+            setTimeout(() => status.classList.add('hidden'), 2000);
+        }
+    </script>
+</body>
+</html>
