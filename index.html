@@ -2,8 +2,15 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rave Clone - v0.4 (Sonsuz Döngü Korumalı)</title>
+    <!-- MOBİL PWA EKLENTİLERİ BAŞLANGICI -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>rOOms</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="rOOms">
+    <!-- MOBİL PWA EKLENTİLERİ BİTİŞİ -->
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -14,7 +21,7 @@
 <body class="bg-rave-bg text-gray-200 min-h-screen p-0 font-sans flex flex-col">
 
     <header class="flex justify-between items-center bg-rave-bg px-4 py-2 border-b border-rave-border shadow-md">
-        <h1 class="text-lg font-bold text-gray-100 cursor-pointer">rave</h1>
+        <h1 class="text-lg font-bold text-gray-100 cursor-pointer">rOOms</h1>
         <div class="flex items-center gap-2">
             <span id="connectionDot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
             <span class="text-xs text-gray-400 font-mono" id="connectionStatus">Bağlantı Bekleniyor</span>
@@ -48,7 +55,7 @@
             
             <div class="p-4 border-b border-rave-border space-y-4">
                 <div class="flex items-center gap-3">
-                    <span id="raveIdText" class="text-sm font-semibold text-gray-100">RAVE-<span id="roomIdText">...</span></span>
+                    <span id="raveIdText" class="text-sm font-semibold text-gray-100">ROOM-<span id="roomIdText">...</span></span>
                     <span id="userBadge" class="text-xs bg-rave-bg px-2 py-1 rounded text-gray-400 ml-auto font-mono"></span>
                 </div>
             </div>
@@ -83,7 +90,7 @@
         let activeVideoId = null;
         let ws = null; 
         let myUsername = "User-" + Math.floor(Math.random() * 1000); 
-        let remoteLockUntil = 0; // MÜHENDİSLİK ÇÖZÜMÜ: Sonsuz döngü kilit mekanizması
+        let remoteLockUntil = 0; 
 
         window.onload = () => {
             document.getElementById('userBadge').innerText = myUsername;
@@ -145,13 +152,9 @@
             });
         }
 
-        // ==========================================
-        // VİDEO SENKRONİZASYON MOTORU
-        // ==========================================
         function onPlayerStateChange(event) {
             if(!ws || ws.readyState !== WebSocket.OPEN) return;
             
-            // KİLİT KONTROLÜ: Eğer şu an Python'dan gelen emrin şoku (1 saniyelik soğuma) sürüyorsa, görmezden gel!
             if (Date.now() < remoteLockUntil) return;
 
             if(event.data == 1 || event.data == 2) {
@@ -166,9 +169,6 @@
             }
         }
 
-        // ==========================================
-        // WEBSOCKET (PYTHON İLE HABERLEŞME)
-        // ==========================================
         function connectToPython(roomId) {
             ws = new WebSocket(`wss://rave-clone-934x.onrender.com/ws/${roomId}`);
 
@@ -185,7 +185,6 @@
                     addChatMessage(data.sender, data.text, "text-gray-300");
                 } 
                 else if (data.type === 'sync' && data.sender !== myUsername) {
-                    // KİLİDİ DEVREYE SOK: Önümüzdeki 1000 milisaniye boyunca YouTube'un tetikleyeceği yankı eventlerini çöpe at
                     remoteLockUntil = Date.now() + 1000; 
                     
                     if(data.state == 1) { 
@@ -232,6 +231,17 @@
             const status = document.getElementById('copyStatus');
             status.classList.remove('hidden');
             setTimeout(() => status.classList.add('hidden'), 2000);
+        }
+    </script>
+
+    <!-- PWA SERVİS MOTORU BAŞLATICI -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Mobil motor aktif!'))
+                    .catch(err => console.error('Motor hatası:', err));
+            });
         }
     </script>
 </body>

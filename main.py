@@ -51,3 +51,10 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
 @app.get("/")
 async def serve_home():
     return FileResponse("index.html")
+@app.get("/manifest.json")
+async def serve_manifest():
+    return FileResponse("manifest.json")
+
+@app.get("/sw.js")
+async def serve_sw():
+    return FileResponse("sw.js")
