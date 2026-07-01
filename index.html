@@ -107,37 +107,20 @@
         <div id="modalBackdrop" onclick="closeSetupModal()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity"></div>
     </div>
 
-    <div id="roomScreen" class="flex flex-col lg:flex-row flex-1 h-screen overflow-hidden hidden">
-        
-        <div id="videoContainer" class="w-full h-[40vh] lg:flex-1 lg:h-full bg-black relative border-b lg:border-b-0 lg:border-r border-rooms-border">
+    <div id="roomScreen" class="flex flex-col lg:flex-row h-screen hidden">
+        <div id="videoContainer" class="flex-1 bg-black relative flex items-center justify-center h-[40vh] lg:h-full">
             <button onclick="exitRoom()" class="absolute top-4 left-4 z-50 bg-black/60 backdrop-blur text-white px-4 py-2 rounded-full text-xs font-bold border border-white/10 active:scale-95 hover:bg-red-500 transition">✕ Odadan Çık</button>
-            <div class="absolute inset-0 w-full h-full">
-                <div id="player" class="w-full h-full"></div>
-            </div>
+            <div id="player" class="w-full h-full"></div>
         </div>
-
-        <div id="ravePanel" class="w-full h-[60vh] lg:w-[360px] lg:h-full bg-rooms-panel flex flex-col">
+        <div id="ravePanel" class="w-full lg:w-[360px] h-[60vh] lg:h-full bg-rooms-panel flex flex-col border-l border-rooms-border">
             <div class="p-4 border-b border-rooms-border flex justify-between items-center bg-rooms-bg/50">
                 <span class="text-xs bg-rooms-accent/10 text-rooms-accent font-bold px-3 py-1.5 rounded-full border border-rooms-accent/20" id="roomIdText">ROOM-...</span>
-                <div class="flex items-center gap-2">
-                    <span id="connectionDot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                    <span class="text-xs text-gray-400 font-mono" id="connectionStatus">Bağlantı Yok</span>
-                </div>
+                <span id="connectionStatus" class="text-xs text-gray-400 font-mono">Bağlantı Yok</span>
             </div>
-
-            <div class="p-4 bg-rooms-bg/30 border-b border-rooms-border">
-                <p class="text-[10px] text-gray-500 font-bold mb-2 uppercase tracking-wider">Davet Linki</p>
-                <div class="flex items-center gap-2">
-                    <input type="text" id="shareUrlInput" readonly class="bg-rooms-bg text-gray-300 text-xs px-3 py-2.5 rounded-lg border border-rooms-border font-mono flex-1 outline-none">
-                    <button onclick="copyRoomLink()" class="bg-rooms-accent text-white text-xs px-4 py-2.5 rounded-lg font-bold active:scale-95 transition">Kopyala</button>
-                </div>
-            </div>
-
-            <div id="chatMessages" class="flex-1 p-4 space-y-3 overflow-y-auto text-sm font-sans bg-rooms-panel"></div>
-
-            <div class="p-4 border-t border-rooms-border bg-rooms-bg flex items-center gap-2 sticky bottom-0">
-                <input type="text" id="chatInput" onkeypress="handleEnter(event)" placeholder="Odaya mesaj yaz..." class="flex-1 bg-rooms-panel px-4 py-3 rounded-xl border border-rooms-border focus:border-rooms-accent outline-none text-sm">
-                <button onclick="sendChatMessage()" class="bg-rooms-accent text-white font-bold px-4 py-3 rounded-xl text-sm active:scale-95">Gönder</button>
+            <div id="chatMessages" class="flex-1 p-4 overflow-y-auto text-sm font-sans bg-rooms-panel"></div>
+            <div class="p-4 border-t border-rooms-border bg-rooms-bg flex items-center gap-2">
+                <input type="text" id="chatInput" onkeypress="handleEnter(event)" placeholder="Mesaj..." class="flex-1 bg-rooms-panel p-3 rounded-xl border border-rooms-border text-sm">
+                <button onclick="sendChatMessage()" class="bg-rooms-accent text-white font-bold px-4 py-3 rounded-xl text-sm">Gönder</button>
             </div>
         </div>
     </div>
