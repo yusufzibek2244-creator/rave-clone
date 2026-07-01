@@ -899,6 +899,36 @@
             alert("Davet Linki Kopyalandı! Artık istediğin kişiye gönderebilirsin.");
 
         }
+// --- YOUTUBE API HATASINI ÖNLEMEK İÇİN BU KISMI EKLE ---
+
+let isYTReady = false;
+
+// YouTube kütüphanesi hazır olduğunda otomatik çalışır
+function onYouTubeIframeAPIReady() {
+    isYTReady = true;
+    console.log("YouTube API artık hazır!");
+}
+
+// startRoom fonksiyonunu bul ve içindeki player oluşturma kısmını bununla değiştir
+function startRoom(vId) {
+    showScreen('roomScreen');
+    
+    // Eğer kütüphane henüz yüklenmediyse bekle
+    if (!isYTReady) {
+        setTimeout(() => startRoom(vId), 500);
+        return;
+    }
+
+    // Artık güvenle player oluşturabiliriz
+    player = new YT.Player('player', { 
+        height: '100%', 
+        width: '100%', 
+        videoId: vId,
+        events: {
+            'onReady': (event) => event.target.playVideo()
+        }
+    });
+}
 
     </script>
 
