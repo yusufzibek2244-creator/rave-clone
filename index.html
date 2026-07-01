@@ -378,7 +378,7 @@
 
         // --- SOKET BAĞLANTISI ---
         function connectToPython(roomId, isHost) {
-            ws = new WebSocket(`wss://rave-clone-934x.onrender.com/ws/${roomId}`);
+            ws = new WebSocket(`wss://${window.location.host}/ws/${roomId}`);
 
             ws.onopen = () => {
                 document.getElementById('connectionDot').className = 'w-2 h-2 rounded-full bg-emerald-500';
