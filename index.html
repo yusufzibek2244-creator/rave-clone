@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>rOOms</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         tailwind.config = { theme: { extend: { colors: { rooms: { bg: '#121212', panel: '#1e1e1e', border: '#2d2d2d', accent: '#2196f3', text: '#e0e0e0' } } } } }
     </script>
@@ -15,66 +16,106 @@
         ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-rooms-bg text-rooms-text min-h-screen font-sans antialiased">
+<body class="bg-rooms-bg text-rooms-text min-h-screen antialiased">
 
     <div id="authScreen" class="fixed inset-0 bg-rooms-bg z-50 flex flex-col items-center justify-center p-6">
-        <h1 class="text-5xl font-black text-white mb-12">r<span class="text-rooms-accent">OO</span>ms</h1>
+        <h1 class="text-6xl font-black text-white mb-12">r<span class="text-rooms-accent">OO</span>ms</h1>
         <div class="w-full max-w-sm space-y-4">
-            <input type="text" id="usernameInput" placeholder="Kullanıcı Adı" class="w-full bg-rooms-panel p-3 rounded-xl border border-rooms-border text-white">
-            <button onclick="login()" class="w-full bg-rooms-accent text-white font-bold py-3 rounded-xl">Giriş Yap</button>
+            <input type="text" id="usernameInput" placeholder="Kullanıcı Adı" class="w-full bg-rooms-panel p-4 rounded-xl border border-rooms-border text-white">
+            <button onclick="login()" class="w-full bg-rooms-accent text-white font-bold py-4 rounded-xl">Giriş Yap</button>
         </div>
     </div>
 
-    <div id="lobbyScreen" class="flex flex-col flex-1 h-screen overflow-y-auto">
-        <header class="flex justify-between items-center px-6 py-4 border-b border-rooms-border bg-rooms-bg/95">
-            <h1 class="text-2xl font-black text-white">r<span class="text-rooms-accent">OO</span>ms</h1>
-            <div id="lobbyUserBadge" class="text-xs bg-rooms-panel px-3 py-1 rounded-full border border-rooms-border">...</div>
+    <div id="lobbyScreen" class="hidden flex flex-col h-screen">
+        <header class="p-6 border-b border-rooms-border flex justify-between items-center">
+            <h1 class="text-2xl font-black text-white">rOOms</h1>
+            <div id="lobbyUserBadge" class="bg-rooms-panel px-4 py-2 rounded-full text-xs">...</div>
         </header>
         <div class="p-6">
-            <button onclick="goToSearch()" class="w-full bg-rooms-accent p-4 rounded-xl text-white font-bold">Yeni Oda Kur / Ara</button>
+            <button onclick="goToSearch()" class="w-full bg-rooms-accent p-4 rounded-xl font-bold">Yeni Oda Kur / Ara</button>
             <div id="publicRoomsContainer" class="mt-6 space-y-3"></div>
         </div>
     </div>
 
     <div id="searchScreen" class="hidden h-screen bg-rooms-bg p-6">
         <button onclick="goToLobby()" class="text-white mb-4">← Geri</button>
-        <input type="text" id="youtubeSearchInput" placeholder="Video Linki veya Ara..." class="w-full p-3 rounded-xl bg-rooms-panel text-white border border-rooms-border">
-        <button onclick="performSearch()" class="mt-2 w-full bg-rooms-accent p-3 rounded-xl text-white">Ara</button>
-        <div id="searchResults" class="mt-4 space-y-2"></div>
+        <input type="text" id="youtubeSearchInput" onkeypress="if(event.key==='Enter') performSearch()" placeholder="YouTube'da Ara..." class="w-full p-4 rounded-xl bg-rooms-panel text-white border border-rooms-border">
+        <button onclick="performSearch()" class="mt-2 w-full bg-rooms-accent p-3 rounded-xl">Ara</button>
+        <div id="searchResults" class="mt-6 space-y-3"></div>
     </div>
 
-    <div id="roomScreen" class="hidden h-screen flex flex-col">
-        <div id="player" class="w-full h-64 bg-black"></div>
-        <div id="chatMessages" class="flex-1 overflow-y-auto p-4 text-white"></div>
-        <input type="text" id="chatInput" class="w-full p-4 bg-rooms-panel text-white" placeholder="Mesaj yaz...">
+    <div id="roomScreen" class="hidden h-screen flex flex-col lg:flex-row">
+        <div class="flex-1 bg-black relative">
+            <button onclick="exitRoom()" class="absolute top-4 left-4 z-10 bg-black/50 p-2 rounded-full text-white">✕</button>
+            <div id="player" class="w-full h-full"></div>
+        </div>
+        <div class="w-full lg:w-80 bg-rooms-panel flex flex-col">
+            <div id="chatMessages" class="flex-1 overflow-y-auto p-4 text-xs"></div>
+            <div class="p-4 border-t border-rooms-border">
+                <input type="text" id="chatInput" onkeypress="if(event.key==='Enter') sendChatMessage()" class="w-full p-3 bg-rooms-bg rounded-lg" placeholder="Mesaj yaz...">
+            </div>
+        </div>
     </div>
 
-    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // --- TEMEL MANTIK ---
-        let myUsername = "Misafir";
-        
+        let ws, player, myUsername, currentRoomId;
+        const API_KEY = "AIzaSyD269hfWkPpCCuhK0ZF1qMUUQaY44JEMWE";
+
         function login() {
-            const user = document.getElementById('usernameInput').value;
-            if(user) {
-                myUsername = user;
-                document.getElementById('authScreen').classList.add('hidden');
-                document.getElementById('lobbyUserBadge').innerText = myUsername;
-            }
+            myUsername = document.getElementById('usernameInput').value || "Misafir";
+            document.getElementById('lobbyUserBadge').innerText = myUsername;
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('lobbyScreen').classList.remove('hidden');
         }
 
         function showScreen(id) {
-            document.getElementById('lobbyScreen').classList.add('hidden');
-            document.getElementById('searchScreen').classList.add('hidden');
-            document.getElementById('roomScreen').classList.add('hidden');
+            ['lobbyScreen', 'searchScreen', 'roomScreen'].forEach(s => document.getElementById(s).classList.add('hidden'));
             document.getElementById(id).classList.remove('hidden');
         }
 
         function goToLobby() { showScreen('lobbyScreen'); }
         function goToSearch() { showScreen('searchScreen'); }
 
-        // Buraya diğer WebSocket ve API fonksiyonlarını (sendChatMessage, performSearch vb.) eklemeye devam edebilirsin.
-        // Şimdilik sistemin çalışması için temel iskelet bu şekilde hazır.
+        function performSearch() {
+            const q = document.getElementById('youtubeSearchInput').value;
+            fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${q}&type=video&key=${API_KEY}`)
+                .then(r => r.json())
+                .then(data => {
+                    const res = document.getElementById('searchResults');
+                    res.innerHTML = "";
+                    data.items.forEach(item => {
+                        res.innerHTML += `<div onclick="setupRoom('${item.id.videoId}')" class="p-3 bg-rooms-panel rounded-lg cursor-pointer">${item.snippet.title}</div>`;
+                    });
+                });
+        }
+
+        function setupRoom(videoId) {
+            currentRoomId = Math.floor(Math.random()*9000);
+            showScreen('roomScreen');
+            player = new YT.Player('player', { height: '100%', width: '100%', videoId: videoId });
+            connectWS();
+        }
+
+        function connectWS() {
+            ws = new WebSocket(`wss://${window.location.host}/ws/${currentRoomId}`);
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if(data.type === 'chat') addChat(data.sender, data.text);
+            };
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            ws.send(JSON.stringify({type: 'chat', sender: myUsername, text: input.value}));
+            input.value = "";
+        }
+
+        function addChat(sender, text) {
+            const box = document.getElementById('chatMessages');
+            box.innerHTML += `<div><b>${sender}:</b> ${text}</div>`;
+        }
+
+        function exitRoom() { location.reload(); }
     </script>
 </body>
 </html>
