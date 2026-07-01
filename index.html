@@ -30,7 +30,7 @@
 </head>
 <body class="bg-rooms-bg text-rooms-text min-h-screen p-0 font-sans flex flex-col antialiased">
 
-    <div id="lobbyScreen" class="flex flex-col flex-1 h-screen overflow-y-auto">
+<div id="lobbyScreen" class="flex flex-col flex-1 h-screen overflow-y-auto">
         <header class="flex justify-between items-center px-6 py-4 border-b border-rooms-border sticky top-0 bg-rooms-bg/95 backdrop-blur z-10">
             <h1 class="text-2xl font-black tracking-wider text-white">r<span class="text-rooms-accent">OO</span>ms</h1>
             <div class="text-xs font-mono bg-rooms-panel px-3 py-1.5 rounded-full border border-rooms-border" id="lobbyUserBadge">...</div>
@@ -106,12 +106,12 @@
 
     <div id="roomScreen" class="flex flex-col lg:flex-row flex-1 h-screen overflow-hidden hidden">
         
-        <div id="videoContainer" class="flex-1 bg-black relative flex items-center justify-center h-[40vh] lg:h-full">
+      <div id="videoContainer" class="flex-1 bg-black relative h-[40vh] lg:h-full">
             <button onclick="exitRoom()" class="absolute top-4 left-4 z-50 bg-black/60 backdrop-blur text-white px-4 py-2 rounded-full text-xs font-bold border border-white/10 active:scale-95 hover:bg-red-500 transition">✕ Odadan Çık</button>
-            <div class="w-full aspect-video max-h-full relative">
-                <div id="player" class="absolute inset-0 w-full h-full"></div>
+            <div class="absolute inset-0 w-full h-full">
+                <div id="player"></div>
             </div>
-        </div>
+        </div>  
         
         <div id="ravePanel" class="w-full lg:w-[360px] bg-rooms-panel border-t lg:border-t-0 lg:border-l border-rooms-border flex flex-col flex-1 h-[60vh] lg:h-full">
             <div class="p-4 border-b border-rooms-border flex justify-between items-center bg-rooms-bg/50">
