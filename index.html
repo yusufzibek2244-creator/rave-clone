@@ -2,110 +2,225 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <!-- MOBİL PWA EKLENTİLERİ BAŞLANGICI -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>rOOms</title>
-    <meta name="description" content="rOOms ile arkadaşlarınızla aynı anda YouTube videoları izleyin ve senkronize sohbet edin.">
-    <meta name="keywords" content="watch party, youtube beraber izle, rooms, video senkronizasyon, online sinema">
-    <meta name="author" content="Muhammed Yusuf Zibek">
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="rOOms">
-    <!-- MOBİL PWA EKLENTİLERİ BİTİŞİ -->
+
+    <meta name="description" content="rOOms ile arkadaşlarınızla aynı anda YouTube videoları izleyin ve senkronize sohbet edin.">
+    <meta name="keywords" content="watch party, youtube beraber izle, rooms, video senkronizasyon, online sinema">
+    <meta name="author" content="Muhammed Yusuf Zibek">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
-            theme: { extend: { colors: { rave: { bg: '#1a1a1a', panel: '#2d2d2d', border: '#3a3a3a', accent: '#2196f3' } } } }
+            theme: { 
+                extend: { 
+                    colors: { 
+                        rooms: { bg: '#121212', panel: '#1e1e1e', border: '#2d2d2d', accent: '#2196f3', text: '#e0e0e0' } 
+                    } 
+                } 
+            }
         }
     </script>
+    <style>
+        /* Mobil Uygulama Hissiyatı İçin CSS Sihirleri */
+        body { user-select: none; -webkit-user-select: none; }
+        input { user-select: text; -webkit-user-select: text; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 10px; }
+    </style>
 </head>
-<body class="bg-rave-bg text-gray-200 min-h-screen p-0 font-sans flex flex-col">
+<body class="bg-rooms-bg text-rooms-text min-h-screen p-0 font-sans flex flex-col antialiased">
 
-    <header class="flex justify-between items-center bg-rave-bg px-4 py-2 border-b border-rave-border shadow-md">
-        <h1 class="text-lg font-bold text-gray-100 cursor-pointer">rOOms</h1>
-        <div class="flex items-center gap-2">
-            <span id="connectionDot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-            <span class="text-xs text-gray-400 font-mono" id="connectionStatus">Bağlantı Bekleniyor</span>
+    <div id="lobbyScreen" class="flex flex-col flex-1 h-screen overflow-y-auto">
+        <header class="flex justify-between items-center px-6 py-4 border-b border-rooms-border sticky top-0 bg-rooms-bg/95 backdrop-blur z-10">
+            <h1 class="text-2xl font-black tracking-wider text-white">r<span class="text-rooms-accent">OO</span>ms</h1>
+            <div class="text-xs font-mono bg-rooms-panel px-3 py-1.5 rounded-full border border-rooms-border" id="lobbyUserBadge">...</div>
+        </header>
+
+        <div class="p-6 space-y-4">
+            <h3 class="text-xs font-bold uppercase tracking-widest text-gray-500">Platformlar</h3>
+            <div class="grid grid-cols-3 gap-4">
+                <button onclick="goToSearch()" class="flex flex-col items-center justify-center p-4 bg-rooms-panel border border-rooms-border rounded-2xl transition active:scale-95 hover:border-rooms-accent group">
+                    <div class="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/20 group-hover:scale-105 transition">
+                        <svg class="w-7 h-7 text-white fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                    </div>
+                    <span class="text-xs font-semibold mt-2 text-gray-300">YouTube</span>
+                </button>
+                <div class="flex flex-col items-center justify-center p-4 bg-rooms-panel/40 border border-rooms-border/40 rounded-2xl opacity-40 relative overflow-hidden">
+                    <span class="absolute top-1 right-2 text-[9px] font-mono text-amber-500">YAKINDA</span>
+                    <div class="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center">🎮</div>
+                    <span class="text-xs font-semibold mt-2">Twitch</span>
+                </div>
+                <div class="flex flex-col items-center justify-center p-4 bg-rooms-panel/40 border border-rooms-border/40 rounded-2xl opacity-40 relative overflow-hidden">
+                    <span class="absolute top-1 right-2 text-[9px] font-mono text-amber-500">YAKINDA</span>
+                    <div class="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center">🍿</div>
+                    <span class="text-xs font-semibold mt-2">Netflix</span>
+                </div>
+            </div>
         </div>
-    </header>
 
-    <main class="flex flex-1 overflow-hidden">
-        
-        <div id="videoContainer" class="flex-1 bg-black flex flex-col p-4 space-y-4">
+        <div class="p-6 space-y-4 flex-1 flex flex-col">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xs font-bold uppercase tracking-widest text-gray-500">Canlı İzleme Odaları (Public)</h3>
+                <button onclick="refreshLobby()" class="text-xs text-rooms-accent hover:underline">Yenile ↻</button>
+            </div>
             
-            <div id="videoInfoBar" class="flex justify-between items-center border-b border-rave-border pb-2 hidden">
-                <div class="flex items-center gap-3">
-                    <h2 id="videoTitle" class="text-sm font-semibold text-gray-100">Video Yüklendi</h2>
+            <div id="publicRoomsContainer" class="space-y-3 flex-1">
+                <div class="text-sm text-gray-500 text-center py-8">Şu an aktif açık oda yok. İlk odayı sen kur!</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="searchScreen" class="flex flex-col flex-1 h-screen hidden">
+        <header class="flex items-center gap-4 px-4 py-4 border-b border-rooms-border bg-rooms-panel">
+            <button onclick="goToLobby()" class="text-xl p-2 text-gray-400 active:text-white">←</button>
+            <div class="flex-1 relative">
+                <input type="text" id="videoUrlInput" placeholder="YouTube Video Linki Yapıştırın..." class="w-full bg-rooms-bg px-4 py-3 rounded-xl border border-rooms-border focus:border-rooms-accent outline-none text-sm pr-10">
+            </div>
+        </header>
+
+        <div class="p-6 flex flex-col justify-between flex-1 space-y-6">
+            <div class="bg-rooms-panel p-5 rounded-2xl border border-rooms-border space-y-4">
+                <h4 class="text-sm font-bold text-white">Oda Ayarları</h4>
+                
+                <div class="flex items-center justify-between p-3 bg-rooms-bg rounded-xl border border-rooms-border">
+                    <div>
+                        <p class="text-xs font-bold text-gray-200">Herkese Açık (Public)</p>
+                        <p class="text-[10px] text-gray-500">Odanız ana sayfadaki genel listede listelenir.</p>
+                    </div>
+                    <input type="checkbox" id="isPublicCheckbox" checked class="w-5 h-5 accent-rooms-accent">
                 </div>
             </div>
 
-            <div class="aspect-video w-full flex-1 bg-rave-panel rounded-lg overflow-hidden relative shadow-inner">
+            <button onclick="createRoomFromUrl()" class="w-full bg-rooms-accent text-white py-4 rounded-2xl font-bold transition active:scale-95 shadow-lg shadow-blue-500/10">Odayı Ateşle 🚀</button>
+        </div>
+    </div>
+
+    <div id="roomScreen" class="flex flex-col lg:flex-row flex-1 h-screen overflow-hidden hidden">
+        <div id="videoContainer" class="flex-1 bg-black flex flex-col relative h-[35vh] lg:h-full">
+            <button onclick="exitRoom()" class="absolute top-4 left-4 z-50 bg-black/60 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold border border-white/10 active:scale-95">✕ Odadan Çık</button>
+            <div class="w-full h-full relative">
                 <div id="player"></div> 
             </div>
-            
-            <div id="setupPanel" class="bg-rave-panel p-6 rounded-lg space-y-4 shadow-xl border border-rave-border">
-                <h3 class="text-md font-semibold text-rave-accent">Yeni Bir Oda Kur</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="videoUrlInput" placeholder="YouTube linki yapıştır..." class="flex-1 bg-rave-bg px-4 py-2.5 rounded-lg border border-rave-border focus:border-rave-accent outline-none text-sm">
-                    <button onclick="createRoomFromUrl()" class="bg-rave-accent text-white px-6 py-2.5 rounded-lg font-medium text-sm transition hover:bg-blue-600">Oda Kur</button>
-                </div>
-            </div>
         </div>
 
-        <div id="ravePanel" class="w-[320px] bg-rave-panel border-l border-rave-border flex flex-col">
-            
-            <div class="p-4 border-b border-rave-border space-y-4">
-                <div class="flex items-center gap-3">
-                    <span id="raveIdText" class="text-sm font-semibold text-gray-100">ROOM-<span id="roomIdText">...</span></span>
-                    <span id="userBadge" class="text-xs bg-rave-bg px-2 py-1 rounded text-gray-400 ml-auto font-mono"></span>
+        <div id="ravePanel" class="w-full lg:w-[360px] bg-rooms-panel border-t lg:border-t-0 lg:border-l border-rooms-border flex flex-col flex-1 h-[65vh] lg:h-full">
+            <div class="p-4 border-b border-rooms-border flex justify-between items-center bg-rooms-bg/50">
+                <div>
+                    <span class="text-xs bg-rooms-accent/10 text-rooms-accent font-bold px-2.5 py-1 rounded-full border border-rooms-accent/20" id="roomIdText">ROOM-...</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span id="connectionDot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                    <span class="text-[10px] text-gray-400 font-mono" id="connectionStatus">Bağlantı Yok</span>
                 </div>
             </div>
 
-            <div class="p-4 space-y-4 border-b border-rave-border">
-                <div class="space-y-1.5">
-                    <div class="flex items-center gap-2 text-xs text-gray-400">
-                        <span>🔗 Davet Linki</span>
-                        <span id="copyStatus" class="ml-auto text-emerald-400 text-[10px] hidden">Kopyalandı!</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <input type="text" id="shareUrlInput" readonly class="flex-1 bg-rave-bg text-gray-400 text-[11px] px-3 py-1.5 rounded border border-rave-border font-mono select-all">
-                        <button onclick="copyRoomLink()" id="copyBtn" class="bg-rave-accent text-white text-[10px] px-3 py-1.5 rounded font-medium hover:bg-blue-600">Kopyala</button>
-                    </div>
-                </div>
+            <div class="p-3 bg-rooms-bg/30 border-b border-rooms-border flex items-center justify-between gap-2">
+                <input type="text" id="shareUrlInput" readonly class="bg-rooms-bg text-gray-500 text-[10px] px-3 py-2 rounded-lg border border-rooms-border font-mono flex-1 outline-none">
+                <button onclick="copyRoomLink()" class="bg-rooms-accent/20 text-rooms-accent border border-rooms-accent/30 text-[11px] px-4 py-2 rounded-lg font-bold active:scale-95 transition">Linki Kopyala</button>
             </div>
 
-            <div id="chatMessages" class="flex-1 p-4 space-y-3 overflow-y-auto text-xs text-gray-300 font-mono">
+            <div id="chatMessages" class="flex-1 p-4 space-y-3 overflow-y-auto text-xs font-sans">
                 </div>
 
-            <div class="p-3 border-t border-rave-border bg-rave-bg flex items-center gap-2">
-                <input type="text" id="chatInput" onkeypress="handleEnter(event)" placeholder="Mesaj yaz..." class="flex-1 bg-rave-panel px-3 py-2 rounded-lg border border-rave-border focus:border-rave-accent outline-none text-xs">
-                <button onclick="sendChatMessage()" class="text-rave-accent hover:text-white font-bold px-2">Gönder</button>
+            <div class="p-3 border-t border-rooms-border bg-rooms-bg flex items-center gap-2 sticky bottom-0">
+                <input type="text" id="chatInput" onkeypress="handleEnter(event)" placeholder="Odaya mesaj yaz..." class="flex-1 bg-rooms-panel px-4 py-3 rounded-xl border border-rooms-border focus:border-rooms-accent outline-none text-xs">
+                <button onclick="sendChatMessage()" class="bg-rooms-accent text-white font-bold px-4 py-3 rounded-xl text-xs active:scale-95">Gönder</button>
             </div>
-
         </div>
-    </main>
+    </div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         let player;
         let activeVideoId = null;
         let ws = null; 
-        let myUsername = "User-" + Math.floor(Math.random() * 1000); 
+        let myUsername = "User-" + Math.floor(1000 + Math.random() * 9000); 
         let remoteLockUntil = 0; 
+        let currentRoomId = null;
 
         window.onload = () => {
-            document.getElementById('userBadge').innerText = myUsername;
+            document.getElementById('lobbyUserBadge').innerText = myUsername;
+            
+            // Eğer linkte zaten bir oda kodu varsa direkt o odaya sok
             const params = new URLSearchParams(window.location.search);
             const room = params.get('room');
             const vid = params.get('v');
 
             if (room && vid) {
                 setupRoomLayout(room, vid);
+            } else {
+                goToLobby();
             }
         };
 
+        // --- EKRAN GEÇİŞ YÖNETİCİLERİ ---
+        function showScreen(screenId) {
+            document.getElementById('lobbyScreen').classList.add('hidden');
+            document.getElementById('searchScreen').classList.add('hidden');
+            document.getElementById('roomScreen').classList.add('hidden');
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function goToLobby() {
+            showScreen('lobbyScreen');
+            window.history.pushState({}, '', window.location.pathname);
+            refreshLobby();
+        }
+
+        function goToSearch() {
+            showScreen('searchScreen');
+        }
+
+        // --- PUBLIC LOBBY (VİTRİN) VERİ ÇEKİCİ ---
+        function refreshLobby() {
+            fetch('/api/rooms')
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('publicRoomsContainer');
+                    container.innerHTML = "";
+                    
+                    if(!data.active_rooms || data.active_rooms.length === 0) {
+                        container.innerHTML = `<div class="text-sm text-gray-500 text-center py-8 bg-rooms-panel rounded-2xl border border-rooms-border">Şu an aktif public oda yok.<br>İlk lobi odasını sen kur!</div>`;
+                        return;
+                    }
+
+                    data.active_rooms.forEach(room => {
+                        container.innerHTML += `
+                            <div onclick="joinRoom('${room.room_id}', '${room.video_id}')" class="flex items-center gap-4 p-3 bg-rooms-panel border border-rooms-border rounded-2xl hover:border-rooms-accent transition active:scale-[0.99] cursor-pointer">
+                                <div class="w-16 h-10 bg-black rounded-lg overflow-hidden flex items-center justify-center text-[10px] font-mono text-gray-500 relative">
+                                    <img src="https://img.youtube.com/vi/${room.video_id}/mqdefault.jpg" class="w-full h-full object-cover">
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-bold text-white truncate">${room.host} Odası</p>
+                                    <p class="text-[10px] text-gray-400 mt-0.5">Video ID: ${room.video_id}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">👤 ${room.users_count} Aktif</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                })
+                .catch(err => console.error("Lobi yükleme hatası:", err));
+        }
+
+        function joinRoom(roomId, videoId) {
+            const newStateUrl = `${window.location.pathname}?room=${roomId}&v=${videoId}`;
+            window.history.pushState({}, '', newStateUrl);
+            setupRoomLayout(roomId, videoId);
+        }
+
+        function exitRoom() {
+            if(ws) ws.close();
+            goToLobby();
+        }
+
+        // --- ODA KURULUMU ---
         function onYouTubeIframeAPIReady() {
             if(activeVideoId) loadYouTubePlayer(activeVideoId);
         }
@@ -119,23 +234,25 @@
         function createRoomFromUrl() {
             const url = document.getElementById('videoUrlInput').value.trim();
             const videoId = extractVideoID(url);
-            if(!videoId) return alert("Geçerli bir link yapıştır!");
+            if(!videoId) return alert("Lütfen geçerli bir YouTube video linki yapıştırın!");
 
             const newRoomCode = Math.floor(1000 + Math.random() * 9000);
-            const newStateUrl = `${window.location.pathname}?room=${newRoomCode}&v=${videoId}`;
-            window.history.pushState({path: newStateUrl}, '', newStateUrl);
-            setupRoomLayout(newRoomCode, videoId);
+            joinRoom(newRoomCode, videoId);
         }
 
         function setupRoomLayout(roomCode, videoId) {
             activeVideoId = videoId;
-            document.getElementById('setupPanel').classList.add('hidden');
-            document.getElementById('videoInfoBar').classList.remove('hidden');
-            document.getElementById('roomIdText').innerText = roomCode;
+            currentRoomId = roomCode;
+            showScreen('roomScreen');
+            
+            document.getElementById('roomIdText').innerText = `ROOM-${roomCode}`;
             document.getElementById('shareUrlInput').value = window.location.href;
 
-            if (player) player.loadVideoById(videoId);
-            else setTimeout(() => loadYouTubePlayer(videoId), 500);
+            if (player) {
+                player.loadVideoById(videoId);
+            } else {
+                setTimeout(() => loadYouTubePlayer(videoId), 500);
+            }
 
             connectToPython(roomCode);
         }
@@ -144,69 +261,71 @@
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: vid,
                 playerVars: { 
-                    'playsinline': 1, 
-                    'rel': 0, 
-                    'controls': 1,
+                    'playsinline': 1, 'rel': 0, 'controls': 1,
                     'origin': window.location.origin
                 }, 
-                events: {
-                    'onStateChange': onPlayerStateChange
-                }
+                events: { 'onStateChange': onPlayerStateChange }
             });
         }
 
         function onPlayerStateChange(event) {
             if(!ws || ws.readyState !== WebSocket.OPEN) return;
-            
             if (Date.now() < remoteLockUntil) return;
 
             if(event.data == 1 || event.data == 2) {
-                const currentTime = player.getCurrentTime();
-                const payload = {
+                ws.send(JSON.stringify({
                     type: 'sync',
                     state: event.data, 
-                    time: currentTime,
+                    time: player.getCurrentTime(),
                     sender: myUsername
-                };
-                ws.send(JSON.stringify(payload));
+                }));
             }
         }
 
+        // --- SOHBET VE SİNYAL MOTORU ---
         function connectToPython(roomId) {
             ws = new WebSocket(`wss://rave-clone-934x.onrender.com/ws/${roomId}`);
 
             ws.onopen = () => {
-                document.getElementById('connectionDot').classList.replace('bg-red-500', 'bg-emerald-500');
+                document.getElementById('connectionDot').className = 'w-2 h-2 rounded-full bg-emerald-500';
                 document.getElementById('connectionStatus').innerText = "Bağlı";
-                addChatMessage("Sistem", "Odaya bağlandın.", "text-emerald-400");
+                
+                // MÜHENDİSLİK HAMLESİ: Lobiye odanın kimliğini bildiriyoruz
+                const isPublic = document.getElementById('isPublicCheckbox') ? document.getElementById('isPublicCheckbox').checked : true;
+                ws.send(JSON.stringify({
+                    type: 'room_update',
+                    video_id: activeVideoId,
+                    is_public: isPublic,
+                    host: myUsername
+                }));
+
+                document.getElementById('chatMessages').innerHTML = "";
+                addChatMessage("Sistem", "rOOms dünyasına bağlandın.", "text-emerald-400 font-bold");
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
 
                 if (data.type === 'chat') {
-                    addChatMessage(data.sender, data.text, "text-gray-300");
+                    const isMe = data.sender === myUsername;
+                    addChatMessage(data.sender, data.text, isMe ? "text-rooms-accent font-bold" : "text-gray-300");
                 } 
                 else if (data.type === 'sync' && data.sender !== myUsername) {
                     remoteLockUntil = Date.now() + 1000; 
-                    
+                    player.seekTo(data.time, true);
                     if(data.state == 1) { 
-                        player.seekTo(data.time, true);
                         player.playVideo();
-                        addChatMessage("Sistem", `${data.sender} videoyu başlattı.`, "text-rave-accent");
-                    } 
-                    else if(data.state == 2) { 
-                        player.seekTo(data.time, true);
+                        addChatMessage("Sistem", `${data.sender} videoyu başlattı.`, "text-rooms-accent font-mono text-[10px]");
+                    } else if(data.state == 2) { 
                         player.pauseVideo();
-                        addChatMessage("Sistem", `${data.sender} videoyu durdurdu.`, "text-amber-400");
+                        addChatMessage("Sistem", `${data.sender} videoyu durdurdu.`, "text-amber-500 font-mono text-[10px]");
                     }
                 }
             };
 
             ws.onclose = () => {
-                document.getElementById('connectionDot').classList.replace('bg-emerald-500', 'bg-red-500');
+                document.getElementById('connectionDot').className = 'w-2 h-2 rounded-full bg-red-500 animate-pulse';
                 document.getElementById('connectionStatus').innerText = "Koptu";
-                addChatMessage("Sistem", "Sunucu ile bağlantı kesildi.", "text-red-400");
             };
         }
 
@@ -223,7 +342,12 @@
 
         function addChatMessage(sender, text, colorClass) {
             const box = document.getElementById('chatMessages');
-            box.innerHTML += `<p><span class="${colorClass} font-bold">[${sender}]</span> ${text}</p>`;
+            box.innerHTML += `
+                <div class="bg-rooms-bg/40 p-2.5 rounded-xl border border-rooms-border/50">
+                    <span class="${colorClass}">[${sender}]</span>
+                    <span class="text-gray-200 ml-1">${text}</span>
+                </div>
+            `;
             box.scrollTop = box.scrollHeight;
         }
 
@@ -231,13 +355,10 @@
             const copyText = document.getElementById("shareUrlInput");
             copyText.select();
             navigator.clipboard.writeText(copyText.value);
-            const status = document.getElementById('copyStatus');
-            status.classList.remove('hidden');
-            setTimeout(() => status.classList.add('hidden'), 2000);
+            alert("Oda linki kopyalandı! Arkadaşlarına gönder.");
         }
     </script>
 
-    <!-- PWA SERVİS MOTORU BAŞLATICI -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
