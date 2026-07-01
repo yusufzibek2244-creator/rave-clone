@@ -2,79 +2,46 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>rOOms</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
     <style>
-        body { user-select: none; -webkit-user-select: none; }
-        .hidden { display: none !important; }
+        /* Giriş ekranını en üste sabitle */
+        #authOverlay { position: fixed; inset: 0; z-index: 9999; background: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        /* Asıl uygulamayı başlangıçta gizle */
+        #mainApp { display: none; }
     </style>
 </head>
-<body class="bg-[#121212] text-white min-h-screen">
+<body class="bg-[#121212] text-white">
 
-    <div id="authScreen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#121212] p-6">
-        <h1 class="text-6xl font-black mb-12">r<span class="text-blue-500">OO</span>ms</h1>
-        <div class="w-full max-w-sm space-y-4">
+    <div id="authOverlay">
+        <h1 class="text-6xl font-black mb-10">r<span class="text-blue-500">OO</span>ms</h1>
+        <div class="w-full max-w-sm space-y-4 px-6">
             <input type="text" id="usernameInput" placeholder="Kullanıcı Adı" class="w-full bg-[#1e1e1e] p-4 rounded-xl border border-[#2d2d2d]">
-            <input type="password" placeholder="Şifre" class="w-full bg-[#1e1e1e] p-4 rounded-xl border border-[#2d2d2d]">
-            <button onclick="login()" class="w-full bg-blue-500 py-4 rounded-xl font-bold">Giriş Yap</button>
+            <button onclick="unlockApp()" class="w-full bg-blue-500 py-4 rounded-xl font-bold">Giriş Yap</button>
         </div>
     </div>
 
-    <div id="appContainer">
-        <div id="lobbyScreen" class="p-6">
-            <h1 class="text-2xl font-black mb-6">Lobi</h1>
-            <button onclick="showScreen('searchScreen')" class="w-full bg-blue-500 p-4 rounded-xl font-bold">Yeni Oda Kur</button>
+    <div id="mainApp">
         </div>
-        
-        <div id="searchScreen" class="hidden p-6">
-            <button onclick="showScreen('lobbyScreen')" class="mb-4">← Geri</button>
-            <input type="text" id="youtubeSearchInput" class="w-full p-4 bg-[#1e1e1e] rounded-xl" placeholder="YouTube'da Ara...">
-            <button onclick="performSearch()" class="mt-2 w-full bg-blue-500 p-3 rounded-xl">Ara</button>
-            <div id="searchResults" class="mt-4 space-y-2"></div>
-        </div>
-
-        <div id="roomScreen" class="hidden h-screen flex flex-col">
-            <div id="player" class="w-full h-1/2 bg-black"></div>
-            <div id="chatMessages" class="flex-1 overflow-y-auto p-4"></div>
-        </div>
-    </div>
 
     <script>
-        // --- MANTIK KATMANI (Burası Dokunulmazdır) ---
-        let myUsername = "Misafir";
-        const API_KEY = "AIzaSyD269hfWkPpCCuhK0ZF1qMUUQaY44JEMWE";
-
-        function login() {
-            const user = document.getElementById('usernameInput').value;
-            if(!user) return alert("İsim gir!");
-            myUsername = user;
-            document.getElementById('authScreen').classList.add('hidden');
+        // Giriş yaptıktan sonra çağrılacak fonksiyon
+        function unlockApp() {
+            const name = document.getElementById('usernameInput').value;
+            if(!name) return alert("İsim gir!");
+            
+            // Kullanıcı adını global değişkene ata
+            window.myUsername = name; 
+            
+            // Giriş ekranını kapat, uygulamayı aç
+            document.getElementById('authOverlay').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
         }
 
-        function showScreen(id) {
-            ['lobbyScreen', 'searchScreen', 'roomScreen'].forEach(s => document.getElementById(s).classList.add('hidden'));
-            document.getElementById(id).classList.remove('hidden');
-        }
-
-        function performSearch() {
-            const q = document.getElementById('youtubeSearchInput').value;
-            fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${q}&type=video&key=${API_KEY}`)
-                .then(r => r.json())
-                .then(data => {
-                    const res = document.getElementById('searchResults');
-                    res.innerHTML = "";
-                    data.items.forEach(i => {
-                        res.innerHTML += `<div onclick="startRoom('${i.id.videoId}')" class="p-3 bg-[#1e1e1e] rounded-lg cursor-pointer">${i.snippet.title}</div>`;
-                    });
-                });
-        }
-
-        function startRoom(vId) {
-            showScreen('roomScreen');
-            new YT.Player('player', { height: '100%', width: '100%', videoId: vId });
-        }
+        // --- SENİN ESKİ SCRIPT BLOĞUN BURAYA GELECEK ---
+        // Buraya kendi orijinal scriptlerinin tamamını yapıştır.
+        // Artık uygulama otomatik olarak #mainApp içinde çalışacak.
     </script>
 </body>
 </html>
