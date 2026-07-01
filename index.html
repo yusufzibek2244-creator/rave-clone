@@ -106,10 +106,10 @@
 
     <div id="roomScreen" class="flex flex-col lg:flex-row flex-1 h-screen overflow-hidden hidden">
         
-        <div id="videoContainer" class="flex-1 bg-black relative h-[40vh] lg:h-full">
+        <div id="videoContainer" class="flex-1 bg-black relative flex items-center justify-center h-[40vh] lg:h-full">
             <button onclick="exitRoom()" class="absolute top-4 left-4 z-50 bg-black/60 backdrop-blur text-white px-4 py-2 rounded-full text-xs font-bold border border-white/10 active:scale-95 hover:bg-red-500 transition">✕ Odadan Çık</button>
-            <div class="absolute inset-0 w-full h-full">
-                <div id="player" class="w-full h-full"></div>
+            <div class="w-full aspect-video max-h-full relative">
+                <div id="player" class="absolute inset-0 w-full h-full"></div>
             </div>
         </div>
         
@@ -340,11 +340,18 @@
                         player.loadVideoById(videoId);
                     } else {
                         player = new YT.Player('player', {
-                            height: '100%', width: '100%', videoId: videoId,
-                            playerVars: { 'playsinline': 1, 'rel': 0, 'controls': 1, 'origin': window.location.origin },
+                            height: '100%',
+                            width: '100%',
+                            videoId: videoId,
+                            playerVars: { 
+                                'playsinline': 1, 
+                                'rel': 0, 
+                                'controls': 1, 
+                                'origin': window.location.origin,
+                                'autoplay': 1
+                            },
                             events: { 'onStateChange': onPlayerStateChange }
                         });
-                    }
                 }
             }, 100);
 
