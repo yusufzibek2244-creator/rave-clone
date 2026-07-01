@@ -2,46 +2,82 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>rOOms</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { rooms: { bg: '#121212', panel: '#1e1e1e', border: '#2d2d2d', accent: '#2196f3', text: '#e0e0e0' } } } }
+        }
+    </script>
     <style>
-        /* Giriş ekranını en üste sabitle */
-        #authOverlay { position: fixed; inset: 0; z-index: 9999; background: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        /* Asıl uygulamayı başlangıçta gizle */
-        #mainApp { display: none; }
+        body { user-select: none; -webkit-user-select: none; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-[#121212] text-white">
+<body class="bg-rooms-bg text-rooms-text min-h-screen font-sans">
 
-    <div id="authOverlay">
-        <h1 class="text-6xl font-black mb-10">r<span class="text-blue-500">OO</span>ms</h1>
-        <div class="w-full max-w-sm space-y-4 px-6">
-            <input type="text" id="usernameInput" placeholder="Kullanıcı Adı" class="w-full bg-[#1e1e1e] p-4 rounded-xl border border-[#2d2d2d]">
-            <button onclick="unlockApp()" class="w-full bg-blue-500 py-4 rounded-xl font-bold">Giriş Yap</button>
+    <div id="lobbyScreen" class="flex flex-col flex-1 h-screen overflow-y-auto">
+        <header class="flex justify-between items-center px-6 py-4 border-b border-rooms-border sticky top-0 bg-rooms-bg/95 z-10">
+            <h1 class="text-2xl font-black text-white">r<span class="text-rooms-accent">OO</span>ms</h1>
+            <div class="text-xs font-mono bg-rooms-panel px-3 py-1.5 rounded-full" id="lobbyUserBadge">...</div>
+        </header>
+        
+        <div class="p-6">
+            <button onclick="goToSearch()" class="w-full bg-rooms-accent p-4 rounded-2xl text-white font-bold hover:opacity-90 transition">Oda Kur / Katıl</button>
+        </div>
+        
+        <div class="p-6" id="publicRoomsContainer">
+            <div class="text-sm text-gray-500 text-center py-8">Lobi yükleniyor...</div>
         </div>
     </div>
 
-    <div id="mainApp">
-        </div>
+    <div id="searchScreen" class="hidden flex flex-col flex-1 h-screen bg-rooms-bg">
+        <header class="p-4 border-b border-rooms-border flex items-center gap-3">
+            <button onclick="goToLobby()" class="text-xl text-gray-400">←</button>
+            <input type="text" id="youtubeSearchInput" placeholder="YouTube Linki veya Arama..." class="flex-1 bg-rooms-panel p-3 rounded-xl border border-rooms-border outline-none">
+            <button onclick="performSearch()" class="bg-rooms-accent text-white px-4 py-2 rounded-xl text-sm">Ara</button>
+        </header>
+        <div id="searchResults" class="p-4 space-y-3"></div>
+    </div>
+
+    <div id="roomScreen" class="hidden flex flex-col h-screen">
+        <div id="player" class="w-full h-1/2 bg-black"></div>
+        <div id="chatMessages" class="flex-1 p-4 overflow-y-auto"></div>
+    </div>
 
     <script>
-        // Giriş yaptıktan sonra çağrılacak fonksiyon
-        function unlockApp() {
-            const name = document.getElementById('usernameInput').value;
-            if(!name) return alert("İsim gir!");
-            
-            // Kullanıcı adını global değişkene ata
-            window.myUsername = name; 
-            
-            // Giriş ekranını kapat, uygulamayı aç
-            document.getElementById('authOverlay').style.display = 'none';
-            document.getElementById('mainApp').style.display = 'block';
+        // 1. OTOMATİK KURULUM
+        let myUsername = "User-" + Math.floor(1000 + Math.random() * 9000);
+        
+        window.onload = () => {
+            document.getElementById('lobbyUserBadge').innerText = myUsername;
+            goToLobby(); // Uygulama direkt lobiden başlar
+        };
+
+        // 2. NAVİGASYON (Ekran geçişleri)
+        function showScreen(id) {
+            document.getElementById('lobbyScreen').classList.add('hidden');
+            document.getElementById('searchScreen').classList.add('hidden');
+            document.getElementById('roomScreen').classList.add('hidden');
+            document.getElementById(id).classList.remove('hidden');
         }
 
-        // --- SENİN ESKİ SCRIPT BLOĞUN BURAYA GELECEK ---
-        // Buraya kendi orijinal scriptlerinin tamamını yapıştır.
-        // Artık uygulama otomatik olarak #mainApp içinde çalışacak.
+        function goToLobby() { showScreen('lobbyScreen'); refreshLobby(); }
+        function goToSearch() { showScreen('searchScreen'); }
+
+        // 3. İŞLEVSEL FONKSİYONLAR (Buraya kendi API/WebSocket mantığını ekle)
+        function refreshLobby() {
+            // Buraya API çağrını ekleyeceksin
+            document.getElementById('publicRoomsContainer').innerHTML = `<div class="text-center text-gray-500">Aktif oda yok.</div>`;
+        }
+
+        function performSearch() {
+            const q = document.getElementById('youtubeSearchInput').value;
+            alert("Arama fonksiyonu buraya: " + q);
+        }
     </script>
 </body>
 </html>
