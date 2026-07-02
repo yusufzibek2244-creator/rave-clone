@@ -173,31 +173,80 @@
         
         let selectedVideoForRoom = null;
         let isRoomPublic = true;
+        let reconnectAttempts = 0;
+        let reconnectTimer = null;
+        let isHostSession = false;
 
         const BACKEND_ORIGIN = getBackendOrigin();
         const API_BASE = BACKEND_ORIGIN;
-        const WS_BASE = BACKEND_ORIGIN.replace(/^http/, 'ws');
+        const WS_BASE = getWsOrigin(BACKEND_ORIGIN);
 
         function getBackendOrigin() {
             const host = window.location.hostname;
             const port = window.location.port;
-            const isLocalDev = (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.') || host.startsWith('172.')) && ['5500', '5501', '5173'].includes(port);
-            if (isLocalDev) return `${window.location.protocol}//${host}:8000`;
+            const isLocalFrontend = (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.') || host.startsWith('172.'))
+                && ['5500', '5501', '5173', '3000'].includes(port);
+            if (isLocalFrontend) return `${window.location.protocol}//${host}:8000`;
             return window.location.origin;
+        }
+
+        function getWsOrigin(httpOrigin) {
+            const url = new URL(httpOrigin);
+            url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+            return url.origin;
+        }
+
+        function buildRoomUrl(roomCode, videoId) {
+            const base = `${window.location.origin}${window.location.pathname}`;
+            return `${base}?room=${encodeURIComponent(roomCode)}&v=${encodeURIComponent(videoId)}`;
+        }
+
+        function isHostForRoom(roomCode) {
+            return sessionStorage.getItem(`rooms_host_${roomCode}`) === '1';
+        }
+
+        function markAsHost(roomCode) {
+            sessionStorage.setItem(`rooms_host_${roomCode}`, '1');
         }
 
         window.onload = () => {
             document.getElementById('lobbyUserBadge').innerText = myUsername;
+            handleIncomingRoomLink();
+        };
+
+        async function handleIncomingRoomLink() {
             const params = new URLSearchParams(window.location.search);
             const room = params.get('room');
-            const vid = params.get('v');
+            let vid = params.get('v');
 
-            if (room && vid) {
-                setupRoomLayout(room, vid, false);
-            } else {
+            if (!room) {
                 goToLobby();
+                return;
             }
-        };
+
+            if (!vid) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/room/${encodeURIComponent(room)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.video_id && data.video_id !== 'Bekleniyor') {
+                            vid = data.video_id;
+                        }
+                    }
+                } catch (err) {
+                    console.error('Oda bilgisi alınamadı:', err);
+                }
+            }
+
+            if (!vid) {
+                alert('Oda linki geçersiz veya oda henüz hazır değil. Lütfen ev sahibinden yeni link isteyin.');
+                goToLobby();
+                return;
+            }
+
+            const isHost = isHostForRoom(room);
+            setupRoomLayout(room, vid, isHost);
+        }
 
         // --- EKRAN GEÇİŞLERİ ---
         function showScreen(screenId) {
@@ -249,12 +298,18 @@
         }
 
         function joinRoom(roomId, videoId) {
-            const newStateUrl = `${window.location.pathname}?room=${roomId}&v=${videoId}`;
+            const newStateUrl = buildRoomUrl(roomId, videoId);
             window.history.pushState({}, '', newStateUrl);
             setupRoomLayout(roomId, videoId, false);
         }
 
         function exitRoom() {
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+            reconnectAttempts = 0;
+            isHostSession = false;
             if(ws) ws.close();
             if(player) player.pauseVideo();
             goToLobby();
@@ -356,31 +411,35 @@
         function finalizeRoomCreation() {
             closeSetupModal();
             const newRoomCode = Math.floor(1000 + Math.random() * 9000);
-            const newStateUrl = `${window.location.pathname}?room=${newRoomCode}&v=${selectedVideoForRoom}`;
+            markAsHost(newRoomCode);
+            const newStateUrl = buildRoomUrl(newRoomCode, selectedVideoForRoom);
             window.history.pushState({}, '', newStateUrl);
             setupRoomLayout(newRoomCode, selectedVideoForRoom, true); 
         }
 
         // --- ODA YÖNETİMİ ---
-        function onYouTubeIframeAPIReady() {
-            if(activeVideoId) loadYouTubePlayer(activeVideoId);
-        }
-
         function setupRoomLayout(roomCode, videoId, isHost) {
             activeVideoId = videoId;
             currentRoomId = roomCode;
+            isHostSession = isHost;
             showScreen('roomScreen');
             
             document.getElementById('roomIdText').innerText = `ROOM-${roomCode}`;
-            document.getElementById('shareUrlInput').value = window.location.href;
+            document.getElementById('shareUrlInput').value = buildRoomUrl(roomCode, videoId);
 
-            if (player) {
-                player.loadVideoById(videoId);
-            } else {
-                setTimeout(() => loadYouTubePlayer(videoId), 500);
+            if (typeof YT !== 'undefined' && YT.Player) {
+                if (player) {
+                    player.loadVideoById(videoId);
+                } else {
+                    loadYouTubePlayer(videoId);
+                }
             }
 
             connectToPython(roomCode, isHost);
+        }
+
+        function onYouTubeIframeAPIReady() {
+            if (activeVideoId && !player) loadYouTubePlayer(activeVideoId);
         }
 
         function loadYouTubePlayer(vid){
@@ -402,10 +461,20 @@
 
         // --- SOKET BAĞLANTISI ---
         function connectToPython(roomId, isHost) {
-            if (ws) ws.close();
-            ws = new WebSocket(`${WS_BASE}/ws/${roomId}`);
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+            if (ws) {
+                ws.onclose = null;
+                ws.close();
+            }
+
+            const wsUrl = `${WS_BASE}/ws/${encodeURIComponent(roomId)}`;
+            ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
+                reconnectAttempts = 0;
                 document.getElementById('connectionDot').className = 'w-2 h-2 rounded-full bg-emerald-500';
                 document.getElementById('connectionStatus').innerText = "Bağlı";
                 
@@ -422,6 +491,11 @@
                 addChatMessage("Sistem", "Odaya giriş yapıldı.", "text-emerald-400 font-bold");
             };
 
+            ws.onerror = () => {
+                document.getElementById('connectionDot').className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+                document.getElementById('connectionStatus').innerText = "Bağlanıyor...";
+            };
+
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === 'chat') {
@@ -429,6 +503,7 @@
                     addChatMessage(data.sender, data.text, isMe ? "text-rooms-accent font-bold" : "text-gray-300 font-bold");
                 } 
                 else if (data.type === 'sync' && data.sender !== myUsername) {
+                    if (!player || typeof player.seekTo !== 'function') return;
                     remoteLockUntil = Date.now() + 1000; 
                     player.seekTo(data.time, true);
                     if(data.state == 1) { 
@@ -443,7 +518,13 @@
 
             ws.onclose = () => {
                 document.getElementById('connectionDot').className = 'w-2 h-2 rounded-full bg-red-500 animate-pulse';
-                document.getElementById('connectionStatus').innerText = "Koptu";
+                document.getElementById('connectionStatus').innerText = "Yeniden bağlanıyor...";
+
+                if (currentRoomId === roomId) {
+                    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+                    reconnectAttempts += 1;
+                    reconnectTimer = setTimeout(() => connectToPython(roomId, isHostSession), delay);
+                }
             };
         }
 
