@@ -30,6 +30,18 @@
         input { user-select: text; -webkit-user-select: text; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 10px; }
+        #roomScreen { position: fixed; inset: 0; height: 100vh; height: 100svh; min-height: 0; }
+        #videoContainer { flex: 0 0 auto; height: clamp(190px, 56.25vw, 320px); min-height: 0; }
+        #playerWrap { aspect-ratio: 16 / 9; width: 100%; height: 100%; max-height: 100%; margin: auto; }
+        #player, #player iframe { width: 100% !important; height: 100% !important; display: block; }
+        #ravePanel { flex: 1 1 auto; min-height: 0; }
+        #chatMessages { min-height: 0; }
+        #chatBar { flex: 0 0 auto; }
+        @media (min-width: 1024px) {
+            #videoContainer { flex: 1 1 auto; height: 100%; align-items: center; justify-content: center; min-width: 0; }
+            #playerWrap { height: auto; max-width: 100%; max-height: 100%; }
+            #ravePanel { flex: 0 0 380px; width: 380px; max-width: 380px; height: 100%; }
+        }
     </style>
 </head>
 <body class="bg-rooms-bg text-rooms-text min-h-screen p-0 font-sans flex flex-col antialiased">
@@ -118,14 +130,14 @@
     </div>
 
     <div id="roomScreen" class="flex flex-col lg:flex-row flex-1 h-screen overflow-hidden hidden">
-        <div id="videoContainer" class="flex-1 bg-black flex flex-col relative h-[35vh] lg:h-full">
+        <div id="videoContainer" class="bg-black flex flex-col relative">
             <button onclick="exitRoom()" class="absolute top-4 left-4 z-50 bg-black/60 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold border border-white/10 active:scale-95 hover:bg-red-500/80 transition">✕ Odadan Çık</button>
-            <div class="w-full h-full relative">
+            <div id="playerWrap" class="relative">
                 <div id="player"></div> 
             </div>
         </div>
 
-        <div id="ravePanel" class="w-full lg:w-[360px] bg-rooms-panel border-t lg:border-t-0 lg:border-l border-rooms-border flex flex-col flex-1 h-[65vh] lg:h-full">
+        <div id="ravePanel" class="w-full bg-rooms-panel border-t lg:border-t-0 lg:border-l border-rooms-border flex flex-col">
             <div class="p-4 border-b border-rooms-border flex justify-between items-center bg-rooms-bg/50">
                 <div>
                     <span class="text-xs bg-rooms-accent/10 text-rooms-accent font-bold px-2.5 py-1 rounded-full border border-rooms-accent/20" id="roomIdText">ROOM-...</span>
@@ -143,7 +155,7 @@
 
             <div id="chatMessages" class="flex-1 p-4 space-y-3 overflow-y-auto text-xs font-sans"></div>
 
-            <div class="p-3 border-t border-rooms-border bg-rooms-bg flex items-center gap-2 sticky bottom-0">
+            <div id="chatBar" class="p-3 border-t border-rooms-border bg-rooms-bg flex items-center gap-2">
                 <input type="text" id="chatInput" onkeypress="handleEnter(event)" placeholder="Odaya mesaj yaz..." class="flex-1 bg-rooms-panel px-4 py-3 rounded-xl border border-rooms-border focus:border-rooms-accent outline-none text-xs">
                 <button onclick="sendChatMessage()" class="bg-rooms-accent text-white font-bold px-4 py-3 rounded-xl text-xs active:scale-95">Gönder</button>
             </div>
