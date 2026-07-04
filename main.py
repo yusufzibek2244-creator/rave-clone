@@ -25,15 +25,35 @@ class ConnectionManager:
         # Oda ilk defa kuruluyorsa
         if room_id not in self.rooms:
             self.rooms[room_id] = {
-                "clients": {},          # websocket -> username eşleşmesi
+                "clients": {},
                 "is_public": True,
                 "video_id": "Bekleniyor",
-                "host": username        # Odayı kuran ilk kişi yöneticidir
+                "host": username,
+                "hierarchy": [] # YENİ: Kıdem (Öncelik) listesi
             }
             
-        self.rooms[room_id]["clients"][websocket] = username
+        room = self.rooms[room_id]
+        
+        # Eğer kullanıcı daha önce bu odaya girmediyse, kıdem listesinin sonuna ekle
+        if username not in room["hierarchy"]:
+            room["hierarchy"].append(username)
+            
+        room["clients"][websocket] = username
+        
+        # Yeni biri girdiğinde lideri tekrar hesapla (Eski kıdemli lider geri dönmüş olabilir)
+        old_host = room["host"]
+        for user in room["hierarchy"]:
+            if user in room["clients"].values():
+                room["host"] = user
+                break
+                
         await self.broadcast_user_list(room_id)
+        
         await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"{username} odaya katıldı.", "color": "text-emerald-400"}), room_id)
+        
+        # Eğer eski lider döndüğü için liderlik değiştiyse mesaj at
+        if old_host != room["host"] and room["host"] == username:
+            await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"👑 Kurucu lider {username} odaya geri döndü ve yöneticiliği otomatik devraldı!", "color": "text-rooms-accent"}), room_id)
 
     async def disconnect(self, websocket: WebSocket, room_id: str):
         if room_id in self.rooms:
@@ -44,11 +64,16 @@ class ConnectionManager:
             if len(room["clients"]) == 0:
                 del self.rooms[room_id]
             else:
-                # Çıkan kişi yöneticiyse, sıradaki kişiye yöneticiliği devret
-                if room["host"] == username:
-                    new_host_ws = list(room["clients"].keys())[0]
-                    room["host"] = room["clients"][new_host_ws]
-                    await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"Yönetici ayrıldı. Yeni yönetici: {room['host']}", "color": "text-amber-500"}), room_id)
+                old_host = room["host"]
+                
+                # Yönetici çıktıysa sıradaki en kıdemliyi bul
+                for user in room["hierarchy"]:
+                    if user in room["clients"].values():
+                        room["host"] = user
+                        break
+                
+                if old_host == username and old_host != room["host"]:
+                    await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"Yönetici ayrıldı. Yeni lider: {room['host']}", "color": "text-amber-500"}), room_id)
                 
                 await self.broadcast_user_list(room_id)
                 await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"{username} odadan ayrıldı.", "color": "text-gray-500"}), room_id)
@@ -93,7 +118,6 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# WebSoket bağlantısına username parametresini ekledik
 @app.websocket("/ws/{room_id}/{username}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
     await manager.connect(websocket, room_id, username)
@@ -105,12 +129,10 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 msg_type = parsed_data.get("type")
                 room = manager.rooms[room_id]
 
-                # Sadece yönetici videoyu senkronize edebilir
                 if msg_type == "sync":
                     if room["host"] == username:
                         await manager.broadcast_to_room(data, room_id, exclude=websocket)
                 
-                # Sadece yönetici birini odadan atabilir
                 elif msg_type == "kick":
                     if room["host"] == username:
                         target = parsed_data.get("target")
@@ -120,54 +142,50 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                                 await ws.close()
                                 break
                 
-                # Sadece yönetici yöneticiliği devredebilir
                 elif msg_type == "transfer_host":
                     if room["host"] == username:
-                        room["host"] = parsed_data.get("target")
+                        target = parsed_data.get("target")
+                        # YENİ: Devredilen kişiyi kıdem listesinin en başına alarak asıl lider yapıyoruz
+                        if target in room["hierarchy"]:
+                            room["hierarchy"].remove(target)
+                        room["hierarchy"].insert(0, target)
+                        room["host"] = target
+                        
                         await manager.broadcast_user_list(room_id)
                         await manager.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"👑 {username}, yöneticiliği {room['host']} kişisine devretti.", "color": "text-rooms-accent"}), room_id)
 
-                # Sohbet mesajları herkes için serbest
                 elif msg_type == "chat":
                     await manager.broadcast_to_room(data, room_id)
-                
-                # Odaya yeni katılan misafirin videonun nerede olduğunu sorması
+                    
                 elif msg_type == "request_sync":
                     await manager.broadcast_to_room(data, room_id, exclude=websocket)
                 
-                # Oda güncellemeleri
+                elif msg_type == "sync_check":
+                    await manager.broadcast_to_room(data, room_id, exclude=websocket)
+                
                 elif msg_type == "room_update":
                     if "video_id" in parsed_data:
                         room["video_id"] = parsed_data["video_id"]
                     if "is_public" in parsed_data:
                         room["is_public"] = parsed_data["is_public"]
 
-            except:
+            except Exception as e:
                 pass 
             
     except WebSocketDisconnect:
         await manager.disconnect(websocket, room_id)
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health(): return {"status": "ok"}
 
 @app.get("/api/rooms")
-async def api_get_rooms():
-    return {"active_rooms": manager.get_public_rooms()}
+async def api_get_rooms(): return {"active_rooms": manager.get_public_rooms()}
 
 @app.get("/api/room/{room_id}")
 async def api_get_room(room_id: str):
     room = manager.rooms.get(room_id)
-    if not room:
-        raise HTTPException(status_code=404, detail="Oda bulunamadı")
-    return {
-        "room_id": room_id,
-        "video_id": room["video_id"],
-        "is_public": room["is_public"],
-        "host": room["host"],
-        "users_count": len(room["clients"]),
-    }
+    if not room: raise HTTPException(status_code=404, detail="Oda bulunamadı")
+    return {"room_id": room_id, "video_id": room["video_id"], "is_public": room["is_public"], "host": room["host"], "users_count": len(room["clients"])}
 
 @app.get("/")
 async def serve_home(): return FileResponse("index.html")
@@ -175,3 +193,8 @@ async def serve_home(): return FileResponse("index.html")
 async def serve_manifest(): return FileResponse("manifest.json")
 @app.get("/sw.js")
 async def serve_sw(): return FileResponse("sw.js")
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*", ws_ping_interval=20, ws_ping_timeout=20)
