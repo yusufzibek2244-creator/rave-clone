@@ -132,9 +132,7 @@
     <div id="roomScreen" class="flex flex-col lg:flex-row flex-1 h-screen overflow-hidden hidden">
         <div id="videoContainer" class="bg-black flex flex-col relative">
             <button onclick="exitRoom()" class="absolute top-4 left-4 z-50 bg-black/60 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold border border-white/10 active:scale-95 hover:bg-red-500/80 transition">✕ Odadan Çık</button>
-            <div id="playerWrap" class="relative">
-                <!-- YÖNETİCİ OLMAYANLARI ENGELLEYEN ŞEFFAF KALKAN BURADA EKLİ -->
-                <div id="videoBlocker" class="absolute inset-0 z-40 hidden bg-transparent"></div>
+            <div id="playerWrap" class="relative">      
                 <div id="player"></div> 
             </div>
         </div>
@@ -184,7 +182,7 @@
         let remoteLockUntil = 0; 
         let currentRoomId = null;
         let currentRoomHost = null; // Yöneticinin kim olduğunu tutacağız
-        
+        let lastKnownHostState = 1; // YENİ: Yöneticinin videoyu durdurup durdurmadığını aklımızda tutacağız
         let selectedVideoForRoom = null;
         let isRoomPublic = true;
         let reconnectAttempts = 0;
@@ -491,12 +489,27 @@
 
         function onPlayerStateChange(event) {
             if(!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            // EĞER KİŞİ YÖNETİCİ DEĞİLSE
+            if (currentRoomHost !== myUsername) {
+                // Eğer sunucudan emir gelmemişse (kendi eliyle videoya dokunmuşsa)
+                if (Date.now() >= remoteLockUntil) {
+                    // Yönetici videoyu oynatıyorsa ve misafir durdurmaya kalkarsa, zorla geri başlat
+                    if (event.data === 2 && lastKnownHostState === 1) {
+                        player.playVideo();
+                    } 
+                    // Yönetici videoyu durdurmuşsa ve misafir başlatmaya kalkarsa, zorla geri durdur
+                    else if (event.data === 1 && lastKnownHostState === 2) {
+                        player.pauseVideo();
+                    }
+                }
+                return; // Yönetici olmadığı için asla sunucuya sync emri gönderme
+            }
+
+            // YÖNETİCİ İSE
             if (Date.now() < remoteLockUntil) return;
-
-            // EĞER KİŞİ YÖNETİCİ DEĞİLSE SYNC GÖNDERMEZ
-            if (currentRoomHost !== myUsername) return;
-
             if(event.data == 1 || event.data == 2) {
+                lastKnownHostState = event.data; // Yönetici kendi durumunu günceller
                 ws.send(JSON.stringify({ type: 'sync', state: event.data, time: player.getCurrentTime(), sender: myUsername }));
             }
         }
@@ -552,6 +565,7 @@
                 else if (data.type === 'sync' && data.sender !== myUsername) {
                     if (!player || typeof player.seekTo !== 'function') return;
                     remoteLockUntil = Date.now() + 1000; 
+                    lastKnownHostState = data.state; // YENİ EKLENDİ
                     player.seekTo(data.time, true);
                     if(data.state == 1) { 
                         player.playVideo();
@@ -579,14 +593,7 @@
                     currentRoomHost = data.host;
                     document.getElementById('userCountText').innerText = data.users.length;
                     updateUserListUI(data.users, data.host);
-                    
-                    // YÖNETİCİ DEĞİLSE VİDEO KALKANINI AKTİF ET
-                    const blocker = document.getElementById('videoBlocker');
-                    if (currentRoomHost !== myUsername) {
-                        blocker.classList.remove('hidden'); // Tıklamaları engeller
-                    } else {
-                        blocker.classList.add('hidden'); // Yönetici için engeli kaldır
-                    }
+                    // Kalkan aktif/pasif etme kodları buradan tamamen silindi!
                 }
             };
 
