@@ -487,12 +487,11 @@
                 playerVars: { 'playsinline': 1, 'rel': 0, 'controls': 1, 'origin': window.location.origin }, 
                 events: { 
                     'onReady': () => {
-                        // YENİ: Lider olarak geri dönsek bile, kendi 0:00 süremizi başkalarına dayatmamak için sinyal göndermeyi 3 saniyeliğine kilitliyoruz.
+                        // YouTube oynatıcı tam olarak hazırlandı!
                         remoteLockUntil = Date.now() + 3000; 
-                        
-                        // Oynatıcı hazır olduğunda süreyi iste
-                        if (ws && ws.readyState === WebSocket.OPEN && !isHostSession) {
-                            ws.send(JSON.stringify({ type: 'request_sync' }));
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            // Lider veya misafir fark etmez, oynatıcı hazır olunca odadakilerden süreyi iste
+                            ws.send(JSON.stringify({ type: 'request_sync', sender: myUsername }));
                         }
                     },
                     'onStateChange': onPlayerStateChange 
@@ -555,7 +554,7 @@
                 } else {
                     // Bağlantı kurulduğunda oynatıcı çoktan hazırsa süreyi hemen iste
                     if (player && typeof player.seekTo === 'function') {
-                        ws.send(JSON.stringify({ type: 'request_sync' }));
+                        ws.send(JSON.stringify({ type: 'request_sync', sender: myUsername }));
                     }
                 }
 
@@ -591,13 +590,16 @@
                     alert("Oda yöneticisi tarafından odadan çıkarıldınız.");
                     exitRoom();
                 }
-                // YENİ: Yeni biri güncel süreyi sorarsa ve biz yöneticiysek süreyi gönder
-                else if (data.type === 'request_sync') {
-                    if (currentRoomHost === myUsername && player && typeof player.getCurrentTime === 'function') {
+                // EĞER BİRİ SÜREYİ SORARSA (Yeni giren biri veya düşüp geri dönen lider)
+                else if (data.type === 'request_sync' && data.sender !== myUsername) {
+                    if (player && typeof player.getCurrentTime === 'function') {
                         let currentState = player.getPlayerState();
-                        // 1: Oynatılıyor, 2: Duraklatıldı
                         if (currentState === 1 || currentState === 2) {
-                            ws.send(JSON.stringify({ type: 'sync', state: currentState, time: player.getCurrentTime(), sender: myUsername }));
+                            // Eğer ben lidersem DOĞRUDAN cevap veririm.
+                            // VEYA soruyu soran kişi asıl liderse (yani lider düşüp geri gelmişse), misafir olsam bile nerede kaldığımızı ona ben söylerim!
+                            if (currentRoomHost === myUsername || currentRoomHost === data.sender) {
+                                ws.send(JSON.stringify({ type: 'sync', state: currentState, time: player.getCurrentTime(), sender: myUsername }));
+                            }
                         }
                     }
                 }
