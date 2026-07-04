@@ -178,7 +178,14 @@
         let player;
         let activeVideoId = null;
         let ws = null; 
-        let myUsername = "User-" + Math.floor(1000 + Math.random() * 9000); 
+        
+        // YENİ: Kullanıcı adını tarayıcı hafızasında tutuyoruz ki sekme kapanıp açılsa bile liderin kimliği(ismi) değişmesin
+        let myUsername = sessionStorage.getItem('rooms_username');
+        if (!myUsername) {
+            myUsername = "User-" + Math.floor(1000 + Math.random() * 9000);
+            sessionStorage.setItem('rooms_username', myUsername);
+        }
+        
         let remoteLockUntil = 0; 
         let currentRoomId = null;
         let currentRoomHost = null; // Yöneticinin kim olduğunu tutacağız
@@ -225,6 +232,14 @@
             document.getElementById('lobbyUserBadge').innerText = myUsername;
             handleIncomingRoomLink();
         };
+
+        // YENİ: Sekme kapatıldığında veya sayfa yenilendiğinde sunucuya anında "Çıktı" bilgisini ulaştır
+        window.addEventListener('beforeunload', () => {
+            if (ws) {
+                ws.onclose = null; // Yeniden bağlanmaya çalışmasını engelle
+                ws.close();
+            }
+        });
 
         async function handleIncomingRoomLink() {
             const params = new URLSearchParams(window.location.search);
