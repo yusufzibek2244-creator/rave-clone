@@ -284,7 +284,7 @@
                     </div>
                     <h2 class="text-xl font-black mb-2">Odaya Katıl</h2>
                     <p class="text-sm text-gray-400 mb-8">Senkronize izlemeye başlamak için hazır mısın?</p>
-                    <button onclick="document.getElementById('joinOverlay').remove(); setupRoomLayout('${room}', '${vid}', ${isHost});" class="w-full bg-rooms-accent text-white px-6 py-4 rounded-xl font-bold text-lg active:scale-95 transition shadow-lg shadow-blue-500/20">
+                    <button onclick="joinRoomUI('${room}', '${vid}', ${isHost});" class="w-full bg-rooms-accent text-white px-6 py-4 rounded-xl font-bold text-lg active:scale-95 transition shadow-lg shadow-blue-500/20"> class="w-full bg-rooms-accent text-white px-6 py-4 rounded-xl font-bold text-lg active:scale-95 transition shadow-lg shadow-blue-500/20">
                         Katıl ve İzlemeye Başla
                     </button>
                 </div>
@@ -343,7 +343,23 @@
                     });
                 }).catch(err => console.error("Lobi yükleme hatası:", err));
         }
-
+        function joinRoomUI(roomId, videoId, isHost) {
+            const overlay = document.getElementById('joinOverlay');
+            if(overlay) overlay.remove();
+            
+            setupRoomLayout(roomId, videoId, isHost);
+            
+            // YENİ: Liderin kendi 0:00 süresini başkalarına dayatmasını engellemek için 4 saniyelik "Sessizlik (Yayın) Kilidi"
+            remoteLockUntil = Date.now() + 4000;
+            
+            // Oynatıcı ve bağlantı hazır olur olmaz odadakilerden süreyi iste
+            let syncInterval = setInterval(() => {
+                if(ws && ws.readyState === WebSocket.OPEN && player && typeof player.getCurrentTime === 'function') {
+                    ws.send(JSON.stringify({ type: 'request_sync', sender: myUsername }));
+                    clearInterval(syncInterval);
+                }
+            }, 500);
+        }
         function joinRoom(roomId, videoId) {
             const newStateUrl = buildRoomUrl(roomId, videoId);
             window.history.pushState({}, '', newStateUrl);
@@ -361,7 +377,7 @@
                     </div>
                     <h2 class="text-xl font-black mb-2">Odaya Katıl</h2>
                     <p class="text-sm text-gray-400 mb-8">Senkronize izlemeye başlamak için hazır mısın?</p>
-                    <button onclick="document.getElementById('joinOverlay').remove(); setupRoomLayout('${roomId}', '${videoId}', ${isHost});" class="w-full bg-rooms-accent text-white px-6 py-4 rounded-xl font-bold text-lg active:scale-95 transition shadow-lg shadow-blue-500/20">
+                    <button onclick="joinRoomUI('${roomId}', '${videoId}', ${isHost});" class="w-full bg-rooms-accent text-white px-6 py-4 rounded-xl font-bold text-lg active:scale-95 transition shadow-lg shadow-blue-500/20"> class="w-full bg-rooms-accent text-white px-6 py-4 rounded-xl font-bold text-lg active:scale-95 transition shadow-lg shadow-blue-500/20">
                         Katıl ve İzlemeye Başla
                     </button>
                 </div>
@@ -610,7 +626,7 @@
                 } 
                 else if (data.type === 'sync' && data.sender !== myUsername) {
                     if (!player || typeof player.seekTo !== 'function') return;
-                    remoteLockUntil = Date.now() + 1000; 
+                    remoteLockUntil = Date.now() + 3000; 
                     lastKnownHostState = data.state; // YENİ EKLENDİ
                     player.seekTo(data.time, true);
                     if(data.state == 1) { 
