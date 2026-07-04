@@ -487,7 +487,10 @@
                 playerVars: { 'playsinline': 1, 'rel': 0, 'controls': 1, 'origin': window.location.origin }, 
                 events: { 
                     'onReady': () => {
-                        // Oynatıcı hazır olduğunda misafirsek yöneticiden süreyi iste
+                        // YENİ: Lider olarak geri dönsek bile, kendi 0:00 süremizi başkalarına dayatmamak için sinyal göndermeyi 3 saniyeliğine kilitliyoruz.
+                        remoteLockUntil = Date.now() + 3000; 
+                        
+                        // Oynatıcı hazır olduğunda süreyi iste
                         if (ws && ws.readyState === WebSocket.OPEN && !isHostSession) {
                             ws.send(JSON.stringify({ type: 'request_sync' }));
                         }
@@ -598,6 +601,17 @@
                         }
                     }
                 }
+                // YENİ: Asıl lider geri geldiğinde, geçici liderin güncel süreyi asıl lidere aktarması
+                else if (data.type === 'force_sync_request') {
+                    // Eğer ben az önceki geçici lidersem, süreyi yayınlayayım ki asıl lider nerede kaldığımızı bilsin
+                    if (myUsername === data.target && player && typeof player.getCurrentTime === 'function') {
+                        let currentState = player.getPlayerState();
+                        if (currentState === 1 || currentState === 2) {
+                            ws.send(JSON.stringify({ type: 'sync', state: currentState, time: player.getCurrentTime(), sender: myUsername }));
+                        }
+                    }
+                }
+                
                 // YENİ: Yöneticiden gelen radar sinyalini yakala ve gerekirse süreyi eşitle
                 else if (data.type === 'sync_check' && data.sender !== myUsername) {
                     if (!player || typeof player.getCurrentTime !== 'function') return;

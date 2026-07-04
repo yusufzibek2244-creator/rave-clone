@@ -54,6 +54,8 @@ class ConnectionManager:
         # Eğer eski lider döndüğü için liderlik değiştiyse mesaj at
         if old_host != room["host"] and room["host"] == username:
             await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"👑 Kurucu lider {username} odaya geri döndü ve yöneticiliği otomatik devraldı!", "color": "text-rooms-accent"}), room_id)
+            # YENİ: Geçici liderden (old_host), videonun nerede kaldığını asıl lidere göndermesini iste
+            await self.broadcast_to_room(json.dumps({"type": "force_sync_request", "target": old_host}), room_id)
 
     async def disconnect(self, websocket: WebSocket, room_id: str):
         if room_id in self.rooms:
