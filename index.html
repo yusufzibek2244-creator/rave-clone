@@ -342,8 +342,18 @@
             }
             reconnectAttempts = 0;
             isHostSession = false;
-            if(ws) ws.close();
-            if(player) player.pauseVideo();
+            currentRoomId = null; // YENİ: Arka planda hayalet gibi yeniden bağlanmayı engeller
+
+            if (ws) {
+                ws.onclose = null; // YENİ: Otomatik bağlanma motorunu fişten çeker
+                ws.close();
+                ws = null;
+            }
+            
+            if (player && typeof player.stopVideo === 'function') {
+                player.stopVideo(); // YENİ: Videoyu sadece duraklatma, tamamen durdur ve kapat
+            }
+            
             goToLobby();
         }
 
