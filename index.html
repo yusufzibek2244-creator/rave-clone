@@ -307,7 +307,8 @@
         function goToLobby() {
             showScreen('lobbyScreen');
             window.history.pushState({}, '', window.location.pathname);
-            refreshLobby();
+            refreshLobby(); // Anında yenile
+            setTimeout(refreshLobby, 600); // YENİ: Sunucunun odayı silmesi için yarım saniye bekleyip tekrar yenile
         }
 
         function goToSearch() {
@@ -746,6 +747,8 @@
             if (ws && ws.readyState === WebSocket.OPEN) {
                 // Sadece yöneticiysek ve video o an oynatılıyorsa bu sinyali gönder
                 if (currentRoomHost === myUsername && player && typeof player.getCurrentTime === 'function') {
+                    if (Date.now() < remoteLockUntil) return; // YENİ: Lider odaya ilk girdiğinde, asıl süreyi öğrenene kadar radarın 0:00 göndermesini engeller!
+                    
                     if (player.getPlayerState() === 1) { 
                         ws.send(JSON.stringify({ 
                             type: 'sync_check', 
