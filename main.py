@@ -17,51 +17,75 @@ app.add_middleware(
 
 class ConnectionManager:
     def __init__(self):
-        # ESKİSİ GİBİ DEĞİL: Artık odaları sadece liste olarak değil, detaylı bir sözlük (kimlik) olarak tutuyoruz.
         self.rooms: Dict[str, Dict[str, Any]] = {}
 
-    async def connect(self, websocket: WebSocket, room_id: str):
+    async def connect(self, websocket: WebSocket, room_id: str, username: str):
         await websocket.accept()
         
-        # Eğer oda ilk defa kuruluyorsa, odanın kimlik kartını oluştur
+        # Oda ilk defa kuruluyorsa
         if room_id not in self.rooms:
             self.rooms[room_id] = {
-                "connections": [],
-                "is_public": True,     # Varsayılan olarak odalar herkese açık (Public)
+                "clients": {},          # websocket -> username eşleşmesi
+                "is_public": True,
                 "video_id": "Bekleniyor",
-                "host": "Bilinmiyor"
+                "host": username        # Odayı kuran ilk kişi yöneticidir
             }
             
-        self.rooms[room_id]["connections"].append(websocket)
+        self.rooms[room_id]["clients"][websocket] = username
+        await self.broadcast_user_list(room_id)
+        await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"{username} odaya katıldı.", "color": "text-emerald-400"}), room_id)
 
-    def disconnect(self, websocket: WebSocket, room_id: str):
+    async def disconnect(self, websocket: WebSocket, room_id: str):
         if room_id in self.rooms:
-            if websocket in self.rooms[room_id]["connections"]:
-                self.rooms[room_id]["connections"].remove(websocket)
-            # Odada kimse kalmadıysa odayı sil
-            if len(self.rooms[room_id]["connections"]) == 0:
+            room = self.rooms[room_id]
+            username = room["clients"].pop(websocket, None)
+            
+            # Odada kimse kalmadıysa sil
+            if len(room["clients"]) == 0:
                 del self.rooms[room_id]
+            else:
+                # Çıkan kişi yöneticiyse, sıradaki kişiye yöneticiliği devret
+                if room["host"] == username:
+                    new_host_ws = list(room["clients"].keys())[0]
+                    room["host"] = room["clients"][new_host_ws]
+                    await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"Yönetici ayrıldı. Yeni yönetici: {room['host']}", "color": "text-amber-500"}), room_id)
+                
+                await self.broadcast_user_list(room_id)
+                await self.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"{username} odadan ayrıldı.", "color": "text-gray-500"}), room_id)
 
-    async def broadcast_to_room(self, message: str, room_id: str):
+    async def broadcast_to_room(self, message: str, room_id: str, exclude: WebSocket = None):
         if room_id not in self.rooms:
             return
         dead = []
-        for connection in self.rooms[room_id]["connections"]:
+        for connection in self.rooms[room_id]["clients"]:
+            if connection == exclude: continue
             try:
                 await connection.send_text(message)
             except Exception:
                 dead.append(connection)
+        
         for connection in dead:
-            self.disconnect(connection, room_id)
+            await self.disconnect(connection, room_id)
 
-    # LOBİ VİTRİNİ İÇİN YENİ MOTOR: Sadece Public olan odaları paketleyip listeler
+    async def broadcast_user_list(self, room_id: str):
+        if room_id not in self.rooms:
+            return
+        room = self.rooms[room_id]
+        users = list(room["clients"].values())
+        data = json.dumps({
+            "type": "user_list",
+            "users": users,
+            "host": room["host"]
+        })
+        await self.broadcast_to_room(data, room_id)
+
     def get_public_rooms(self):
         public_rooms = []
         for r_id, r_data in self.rooms.items():
             if r_data["is_public"]:
                 public_rooms.append({
                     "room_id": r_id,
-                    "users_count": len(r_data["connections"]),
+                    "users_count": len(r_data["clients"]),
                     "video_id": r_data["video_id"],
                     "host": r_data["host"]
                 })
@@ -69,36 +93,61 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-@app.websocket("/ws/{room_id}")
-async def websocket_endpoint(websocket: WebSocket, room_id: str):
-    await manager.connect(websocket, room_id)
+# WebSoket bağlantısına username parametresini ekledik
+@app.websocket("/ws/{room_id}/{username}")
+async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
+    await manager.connect(websocket, room_id, username)
     try:
         while True:
             data = await websocket.receive_text()
-            
-            # Gelen mesajı JSON olarak okuyup, odanın kimlik kartını güncelliyoruz (Örn: Video değişirse veya Oda kilitlenirse)
             try:
                 parsed_data = json.loads(data)
-                if parsed_data.get("type") == "room_update":
-                    if "video_id" in parsed_data:
-                        manager.rooms[room_id]["video_id"] = parsed_data["video_id"]
-                    if "is_public" in parsed_data:
-                        manager.rooms[room_id]["is_public"] = parsed_data["is_public"]
-                    if "host" in parsed_data:
-                        manager.rooms[room_id]["host"] = parsed_data["host"]
-            except:
-                pass # JSON değilse normal mesajdır, geç
+                msg_type = parsed_data.get("type")
+                room = manager.rooms[room_id]
 
-            await manager.broadcast_to_room(data, room_id)
+                # Sadece yönetici videoyu senkronize edebilir
+                if msg_type == "sync":
+                    if room["host"] == username:
+                        await manager.broadcast_to_room(data, room_id, exclude=websocket)
+                
+                # Sadece yönetici birini odadan atabilir
+                elif msg_type == "kick":
+                    if room["host"] == username:
+                        target = parsed_data.get("target")
+                        for ws, uname in list(room["clients"].items()):
+                            if uname == target:
+                                await ws.send_text(json.dumps({"type": "kicked"}))
+                                await ws.close()
+                                break
+                
+                # Sadece yönetici yöneticiliği devredebilir
+                elif msg_type == "transfer_host":
+                    if room["host"] == username:
+                        room["host"] = parsed_data.get("target")
+                        await manager.broadcast_user_list(room_id)
+                        await manager.broadcast_to_room(json.dumps({"type": "chat", "sender": "Sistem", "text": f"👑 {username}, yöneticiliği {room['host']} kişisine devretti.", "color": "text-rooms-accent"}), room_id)
+
+                # Sohbet mesajları herkes için serbest
+                elif msg_type == "chat":
+                    await manager.broadcast_to_room(data, room_id)
+                
+                # Oda güncellemeleri
+                elif msg_type == "room_update":
+                    if "video_id" in parsed_data:
+                        room["video_id"] = parsed_data["video_id"]
+                    if "is_public" in parsed_data:
+                        room["is_public"] = parsed_data["is_public"]
+
+            except:
+                pass 
             
     except WebSocketDisconnect:
-        manager.disconnect(websocket, room_id)
+        await manager.disconnect(websocket, room_id)
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
-# --- VİTRİN (LOBİ) İÇİN YEPYENİ BİR API ROTASI ---
 @app.get("/api/rooms")
 async def api_get_rooms():
     return {"active_rooms": manager.get_public_rooms()}
@@ -113,32 +162,12 @@ async def api_get_room(room_id: str):
         "video_id": room["video_id"],
         "is_public": room["is_public"],
         "host": room["host"],
-        "users_count": len(room["connections"]),
+        "users_count": len(room["clients"]),
     }
 
-# --- STANDART DOSYA ROTALARI ---
 @app.get("/")
-async def serve_home():
-    return FileResponse("index.html")
-
+async def serve_home(): return FileResponse("index.html")
 @app.get("/manifest.json")
-async def serve_manifest():
-    return FileResponse("manifest.json")
-
+async def serve_manifest(): return FileResponse("manifest.json")
 @app.get("/sw.js")
-async def serve_sw():
-    return FileResponse("sw.js")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", "8000"))
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=port,
-        proxy_headers=True,
-        forwarded_allow_ips="*",
-        ws_ping_interval=20,
-        ws_ping_timeout=20,
-    )
+async def serve_sw(): return FileResponse("sw.js")

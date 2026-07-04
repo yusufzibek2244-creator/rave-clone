@@ -133,6 +133,8 @@
         <div id="videoContainer" class="bg-black flex flex-col relative">
             <button onclick="exitRoom()" class="absolute top-4 left-4 z-50 bg-black/60 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold border border-white/10 active:scale-95 hover:bg-red-500/80 transition">✕ Odadan Çık</button>
             <div id="playerWrap" class="relative">
+                <!-- YÖNETİCİ OLMAYANLARI ENGELLEYEN ŞEFFAF KALKAN BURADA EKLİ -->
+                <div id="videoBlocker" class="absolute inset-0 z-40 hidden bg-transparent"></div>
                 <div id="player"></div> 
             </div>
         </div>
@@ -142,15 +144,26 @@
                 <div>
                     <span class="text-xs bg-rooms-accent/10 text-rooms-accent font-bold px-2.5 py-1 rounded-full border border-rooms-accent/20" id="roomIdText">ROOM-...</span>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    <span id="connectionDot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                    <span class="text-[10px] text-gray-400 font-mono" id="connectionStatus">Bağlantı Yok</span>
+                <div class="flex items-center gap-3">
+                    <!-- KULLANICILAR BUTONU -->
+                    <button onclick="toggleUserList()" class="text-[11px] bg-gray-800 text-gray-300 px-3 py-1 rounded-lg border border-gray-600 hover:text-white transition">👥 <span id="userCountText">1</span></button>
+                    
+                    <div class="flex items-center gap-1.5">
+                        <span id="connectionDot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        <span class="text-[10px] text-gray-400 font-mono" id="connectionStatus">Bağlantı Yok</span>
+                    </div>
                 </div>
             </div>
 
             <div class="p-3 bg-rooms-bg/30 border-b border-rooms-border flex items-center justify-between gap-2">
                 <input type="text" id="shareUrlInput" readonly class="bg-rooms-bg text-gray-500 text-[10px] px-3 py-2 rounded-lg border border-rooms-border font-mono flex-1 outline-none">
                 <button onclick="copyRoomLink()" class="bg-rooms-accent/20 text-rooms-accent border border-rooms-accent/30 text-[11px] px-4 py-2 rounded-lg font-bold active:scale-95 transition">Davet Et</button>
+            </div>
+
+            <!-- KULLANICI LİSTESİ PANELİ (Varsayılan olarak gizli) -->
+            <div id="userListPanel" class="hidden absolute top-[115px] left-0 right-0 bg-rooms-panel border-b border-rooms-border z-30 shadow-2xl p-4 max-h-[50%] overflow-y-auto">
+                <h4 class="text-xs font-bold text-gray-400 mb-3 uppercase tracking-widest">Odadan Kişiler</h4>
+                <div id="userListContainer" class="space-y-2"></div>
             </div>
 
             <div id="chatMessages" class="flex-1 p-4 space-y-3 overflow-y-auto text-xs font-sans"></div>
@@ -170,6 +183,7 @@
         let myUsername = "User-" + Math.floor(1000 + Math.random() * 9000); 
         let remoteLockUntil = 0; 
         let currentRoomId = null;
+        let currentRoomHost = null; // Yöneticinin kim olduğunu tutacağız
         
         let selectedVideoForRoom = null;
         let isRoomPublic = true;
@@ -248,7 +262,6 @@
             setupRoomLayout(room, vid, isHost);
         }
 
-        // --- EKRAN GEÇİŞLERİ ---
         function showScreen(screenId) {
             document.getElementById('lobbyScreen').classList.add('hidden');
             document.getElementById('searchScreen').classList.add('hidden');
@@ -267,7 +280,6 @@
             document.getElementById('youtubeSearchInput').focus();
         }
 
-        // --- LOBİ (VİTRİN) ---
         function refreshLobby() {
             fetch(`${API_BASE}/api/rooms`)
                 .then(res => res.json())
@@ -315,7 +327,6 @@
             goToLobby();
         }
 
-        // --- YOUTUBE GERÇEK ARAMA MOTORU VE MODAL YÖNETİMİ ---
         function handleSearchEnter(e) { if(e.key === 'Enter') performSearch(); }
 
         function performSearch() {
@@ -377,7 +388,6 @@
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        // --- GİZLİLİK MODALI ---
         function openSetupModal(videoId, title) {
             selectedVideoForRoom = videoId;
             document.getElementById('selectedVideoTitle').innerText = title;
@@ -417,7 +427,6 @@
             setupRoomLayout(newRoomCode, selectedVideoForRoom, true); 
         }
 
-        // --- ODA YÖNETİMİ ---
         function setupRoomLayout(roomCode, videoId, isHost) {
             activeVideoId = videoId;
             currentRoomId = roomCode;
@@ -454,12 +463,14 @@
             if(!ws || ws.readyState !== WebSocket.OPEN) return;
             if (Date.now() < remoteLockUntil) return;
 
+            // EĞER KİŞİ YÖNETİCİ DEĞİLSE SYNC GÖNDERMEZ
+            if (currentRoomHost !== myUsername) return;
+
             if(event.data == 1 || event.data == 2) {
                 ws.send(JSON.stringify({ type: 'sync', state: event.data, time: player.getCurrentTime(), sender: myUsername }));
             }
         }
 
-        // --- SOKET BAĞLANTISI ---
         function connectToPython(roomId, isHost) {
             if (reconnectTimer) {
                 clearTimeout(reconnectTimer);
@@ -470,7 +481,8 @@
                 ws.close();
             }
 
-            const wsUrl = `${WS_BASE}/ws/${encodeURIComponent(roomId)}`;
+            // Artık url'ye myUsername de ekliyoruz
+            const wsUrl = `${WS_BASE}/ws/${encodeURIComponent(roomId)}/${encodeURIComponent(myUsername)}`;
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
@@ -482,13 +494,11 @@
                     ws.send(JSON.stringify({
                         type: 'room_update',
                         video_id: activeVideoId,
-                        is_public: isRoomPublic,
-                        host: myUsername
+                        is_public: isRoomPublic
                     }));
                 }
 
                 document.getElementById('chatMessages').innerHTML = "";
-                addChatMessage("Sistem", "Odaya giriş yapıldı.", "text-emerald-400 font-bold");
             };
 
             ws.onerror = () => {
@@ -498,9 +508,11 @@
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
+                
                 if (data.type === 'chat') {
                     const isMe = data.sender === myUsername;
-                    addChatMessage(data.sender, data.text, isMe ? "text-rooms-accent font-bold" : "text-gray-300 font-bold");
+                    const color = data.color || (isMe ? "text-rooms-accent font-bold" : "text-gray-300 font-bold");
+                    addChatMessage(data.sender, data.text, color);
                 } 
                 else if (data.type === 'sync' && data.sender !== myUsername) {
                     if (!player || typeof player.seekTo !== 'function') return;
@@ -508,10 +520,27 @@
                     player.seekTo(data.time, true);
                     if(data.state == 1) { 
                         player.playVideo();
-                        addChatMessage("Sistem", `${data.sender} videoyu başlattı.`, "text-rooms-accent font-mono text-[10px]");
                     } else if(data.state == 2) { 
                         player.pauseVideo();
-                        addChatMessage("Sistem", `${data.sender} videoyu durdurdu.`, "text-amber-500 font-mono text-[10px]");
+                    }
+                }
+                // ATILMA DURUMU
+                else if (data.type === 'kicked') {
+                    alert("Oda yöneticisi tarafından odadan çıkarıldınız.");
+                    exitRoom();
+                }
+                // KULLANICI LİSTESİ VE YÖNETİCİ GÜNCELLEMESİ
+                else if (data.type === 'user_list') {
+                    currentRoomHost = data.host;
+                    document.getElementById('userCountText').innerText = data.users.length;
+                    updateUserListUI(data.users, data.host);
+                    
+                    // YÖNETİCİ DEĞİLSE VİDEO KALKANINI AKTİF ET
+                    const blocker = document.getElementById('videoBlocker');
+                    if (currentRoomHost !== myUsername) {
+                        blocker.classList.remove('hidden'); // Tıklamaları engeller
+                    } else {
+                        blocker.classList.add('hidden'); // Yönetici için engeli kaldır
                     }
                 }
             };
@@ -526,6 +555,54 @@
                     reconnectTimer = setTimeout(() => connectToPython(roomId, isHostSession), delay);
                 }
             };
+        }
+
+        // YENİ UI FONKSİYONLARI: KULLANICILAR VE YÖNETİM
+        function toggleUserList() {
+            const panel = document.getElementById('userListPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function updateUserListUI(users, host) {
+            const container = document.getElementById('userListContainer');
+            container.innerHTML = "";
+            const iAmHost = (myUsername === host);
+
+            users.forEach(u => {
+                const isMe = (u === myUsername);
+                const isUserHost = (u === host);
+                
+                let actionsHtml = "";
+                if (iAmHost && !isMe) {
+                    actionsHtml = `
+                        <div class="flex gap-2">
+                            <button onclick="transferHost('${u}')" class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-[10px] border border-blue-500/30 hover:bg-blue-500/40">👑 Devret</button>
+                            <button onclick="kickUser('${u}')" class="px-2 py-1 bg-red-500/20 text-red-400 rounded text-[10px] border border-red-500/30 hover:bg-red-500/40">At</button>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML += `
+                    <div class="flex justify-between items-center p-2 rounded-lg bg-rooms-bg border border-rooms-border">
+                        <span class="text-xs text-gray-200">
+                            ${isUserHost ? '👑 ' : ''}${u} ${isMe ? '<span class="text-gray-500">(Sen)</span>' : ''}
+                        </span>
+                        ${actionsHtml}
+                    </div>
+                `;
+            });
+        }
+
+        function kickUser(targetUsername) {
+            if (confirm(`${targetUsername} adlı kullanıcıyı odadan atmak istiyor musun?`)) {
+                ws.send(JSON.stringify({ type: 'kick', target: targetUsername }));
+            }
+        }
+
+        function transferHost(targetUsername) {
+            if (confirm(`Oda yöneticiliğini ${targetUsername} adlı kişiye devretmek istiyor musun? Artık videoyu sen yönetemeyeceksin.`)) {
+                ws.send(JSON.stringify({ type: 'transfer_host', target: targetUsername }));
+            }
         }
 
         function sendChatMessage() {
