@@ -588,6 +588,22 @@
                         }
                     }
                 }
+                // YENİ: Yöneticiden gelen radar sinyalini yakala ve gerekirse süreyi eşitle
+                else if (data.type === 'sync_check' && data.sender !== myUsername) {
+                    if (!player || typeof player.getCurrentTime !== 'function') return;
+                    
+                    // Sadece misafirsek bu işlemi yap
+                    if (currentRoomHost !== myUsername) {
+                        let myTime = player.getCurrentTime();
+                        let timeDiff = Math.abs(myTime - data.time);
+                        
+                        // Eğer aramızdaki fark 2 saniyeden fazlaysa (gecikme veya donma yaşanmışsa)
+                        if (timeDiff > 2) {
+                            remoteLockUntil = Date.now() + 1000;
+                            player.seekTo(data.time, true); // Yöneticinin saniyesine zıpla
+                        }
+                    }
+                }
                 // KULLANICI LİSTESİ VE YÖNETİCİ GÜNCELLEMESİ
                 else if (data.type === 'user_list') {
                     currentRoomHost = data.host;
@@ -684,6 +700,21 @@
             navigator.clipboard.writeText(copyText.value);
             alert("Davet Linki Kopyalandı! Artık istediğin kişiye gönderebilirsin.");
         }
+        // YENİ: Yöneticinin her 2 saniyede bir süresini yayınladığı radar sistemi
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Sadece yöneticiysek ve video o an oynatılıyorsa bu sinyali gönder
+                if (currentRoomHost === myUsername && player && typeof player.getCurrentTime === 'function') {
+                    if (player.getPlayerState() === 1) { 
+                        ws.send(JSON.stringify({ 
+                            type: 'sync_check', 
+                            time: player.getCurrentTime(), 
+                            sender: myUsername 
+                        }));
+                    }
+                }
+            }
+        }, 2000);
     </script>
 </body>
 </html>
