@@ -131,6 +131,10 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 elif msg_type == "chat":
                     await manager.broadcast_to_room(data, room_id)
                 
+                # Odaya yeni katılan misafirin videonun nerede olduğunu sorması
+                elif msg_type == "request_sync":
+                    await manager.broadcast_to_room(data, room_id, exclude=websocket)
+                
                 # Oda güncellemeleri
                 elif msg_type == "room_update":
                     if "video_id" in parsed_data:

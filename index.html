@@ -455,7 +455,15 @@
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: vid,
                 playerVars: { 'playsinline': 1, 'rel': 0, 'controls': 1, 'origin': window.location.origin }, 
-                events: { 'onStateChange': onPlayerStateChange }
+                events: { 
+                    'onReady': () => {
+                        // Oynatıcı hazır olduğunda misafirsek yöneticiden süreyi iste
+                        if (ws && ws.readyState === WebSocket.OPEN && !isHostSession) {
+                            ws.send(JSON.stringify({ type: 'request_sync' }));
+                        }
+                    },
+                    'onStateChange': onPlayerStateChange 
+                }
             });
         }
 
@@ -496,6 +504,11 @@
                         video_id: activeVideoId,
                         is_public: isRoomPublic
                     }));
+                } else {
+                    // Bağlantı kurulduğunda oynatıcı çoktan hazırsa süreyi hemen iste
+                    if (player && typeof player.seekTo === 'function') {
+                        ws.send(JSON.stringify({ type: 'request_sync' }));
+                    }
                 }
 
                 document.getElementById('chatMessages').innerHTML = "";
@@ -528,6 +541,16 @@
                 else if (data.type === 'kicked') {
                     alert("Oda yöneticisi tarafından odadan çıkarıldınız.");
                     exitRoom();
+                }
+                // YENİ: Yeni biri güncel süreyi sorarsa ve biz yöneticiysek süreyi gönder
+                else if (data.type === 'request_sync') {
+                    if (currentRoomHost === myUsername && player && typeof player.getCurrentTime === 'function') {
+                        let currentState = player.getPlayerState();
+                        // 1: Oynatılıyor, 2: Duraklatıldı
+                        if (currentState === 1 || currentState === 2) {
+                            ws.send(JSON.stringify({ type: 'sync', state: currentState, time: player.getCurrentTime(), sender: myUsername }));
+                        }
+                    }
                 }
                 // KULLANICI LİSTESİ VE YÖNETİCİ GÜNCELLEMESİ
                 else if (data.type === 'user_list') {
